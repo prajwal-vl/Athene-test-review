@@ -20,6 +20,7 @@ import { NextResponse } from 'next/server'
 import { verifyQStashSignature } from '@/lib/qstash/verify'
 import { qstash } from '@/lib/qstash/client'
 import { supabaseAdmin } from '@/lib/supabase/server'
+import { getAppBaseUrl } from '@/lib/config/app-url'
 
 // ---- Payload type -------------------------------------------
 
@@ -77,8 +78,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   // 4. Enqueue graph-build for the document set
-  const graphBuildUrl =
-    `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/api/worker/graph-build`
+  const graphBuildUrl = `${getAppBaseUrl()}/api/worker/graph-build`
 
   try {
     await qstash.publishJSON({

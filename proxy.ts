@@ -14,7 +14,7 @@ export default clerkMiddleware(async (auth, request) => {
 
   // 1. Enforce Authentication for non-public routes
   if (!isPublicRoute(request)) {
-    if (!userId && process.env.NODE_ENV !== 'development') {
+    if (!userId) {
       return (await auth()).redirectToSignIn();
     }
   }
@@ -29,7 +29,7 @@ export default clerkMiddleware(async (auth, request) => {
       const requestHeaders = new Headers(request.headers);
 
       // Inject RBAC context into headers for downstream API/Server Components
-      requestHeaders.set("x-current-user-id", access.internal_user_id || userId);
+      requestHeaders.set("x-current-user-id", userId);
       requestHeaders.set("x-current-user-role", access.role || "member"); // Fallback to member
 
       if (access.dept_id) requestHeaders.set("x-current-user-dept-id", access.dept_id);
