@@ -4,7 +4,7 @@
  * resolveModelClient — selects the right LLM client for a given request.
  *
  * Resolution order:
- *  1. Check org's BYOK keys in `llm_keys` (decrypt via pgp_sym_decrypt).
+ *  1. Check org's BYOK keys in `org_api_keys` (decrypt via pgp_sym_decrypt).
  *  2. If BYOK present → instantiate provider client with that key.
  *  3. Else → fall back to platform key from environment variables.
  *  4. Apply model-selection matrix (Chapter 7 of architecture doc).
@@ -44,7 +44,7 @@ import { maxTier, TIER_RANK } from "./tier-utils";
 /** LLM complexity tier used by the supervisor */
 export type ModelTier = "simple" | "medium" | "complex";
 
-/** LLM provider identifier stored in `llm_keys.provider` */
+/** LLM provider identifier stored in `org_api_keys.provider` */
 export type LLMProvider = "anthropic" | "openai" | "google";
 
 /** Returned by resolveModelClient */
@@ -121,19 +121,30 @@ async function fetchByokKey(orgId: string): Promise<ByokResult | null> {
     return cached.result;
   }
 
-  const { data, error } = await supabaseAdmin.rpc("get_decrypted_llm_key", {
-    p_org_id:  orgId,
-    p_kms_key: kmsSecret,
-  });
+  const { data: keyRow, error: keyError } = await supabaseAdmin
+    .from('org_api_keys')
+    .select('provider,key_encrypted')
+    .eq('org_id', orgId)
+    .eq('is_active', true)
+    .limit(1)
+    .maybeSingle();
 
-  if (error) {
-    console.warn("[llm-factory] BYOK lookup failed, falling back to platform key:", error.message);
-    // Cache the null result too — avoids hammering DB on a broken key
+  if (keyError || !keyRow) {
     _byokCache.set(orgId, { result: null, cachedAt: Date.now() });
     return null;
   }
 
-  const row = (data as { provider: LLMProvider; plaintext: string } | null) ?? null;
+  const { data: plaintext, error: decryptError } = await supabaseAdmin.rpc('decrypt_org_api_key', {
+    ciphertext: keyRow.key_encrypted,
+  });
+
+  if (decryptError || !plaintext) {
+    console.warn('[llm-factory] BYOK decrypt failed, using platform key fallback');
+    _byokCache.set(orgId, { result: null, cachedAt: Date.now() });
+    return null;
+  }
+
+  const row = { provider: keyRow.provider as LLMProvider, plaintext: plaintext as string };
   _byokCache.set(orgId, { result: row, cachedAt: Date.now() });
   return row;
 }

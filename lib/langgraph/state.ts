@@ -24,7 +24,7 @@ import { Annotation, MessagesAnnotation } from "@langchain/langgraph";
 // ─── Domain value types ────────────────────────────────────────────────────
 
 /** User roles recognised throughout the system */
-export type UserRole = "member" | "super_user" | "admin";
+export type UserRole = "member" | "bi_analyst" | "admin";
 
 /** LLM complexity tier used by the supervisor to select model */
 export type Complexity = "simple" | "medium" | "complex";
@@ -38,14 +38,15 @@ export type RunStatus = "idle" | "running" | "awaiting_approval" | "completed" |
  * The graph edge map translates these to full node names (retrieval_agent etc.).
  */
 export type ActiveAgent =
-  | "retrieval"
-  | "cross_dept_retrieval"
-  | "email"
-  | "calendar"
-  | "report"
-  | "data_index"
-  | "synthesis"
-  | "END"
+  | "supervisor"
+  | "retrieval_agent"
+  | "cross_dept_agent"
+  | "email_agent"
+  | "calendar_agent"
+  | "report_agent"
+  | "data_index_agent"
+  | "approval_node"
+  | "synthesis_agent"
   | null;
 
 /** Task classification set by the supervisor */
@@ -133,11 +134,12 @@ export const AtheneState = Annotation.Root({
 
   // ── Identity (immutable after request start) ──────────────────────────
   //
-  // NOTE: thread_id is deliberately absent.
-  // LangGraph owns thread_id via RunnableConfig.configurable.thread_id.
-  // Storing it here risks a silent mismatch (state value vs. checkpoint key).
-  // Node functions should read thread_id from config.configurable.thread_id.
-
+  
+    /** LangGraph thread id for resumable runs */
+  thread_id: Annotation<string>({
+    reducer: (_x, y) => y,
+    default: () => "",
+  }),
   /** Internal Supabase org UUID */
   org_id: Annotation<string>({
     reducer: (_x, y) => y,

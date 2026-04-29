@@ -52,8 +52,7 @@ function stubNode(label: string) {
 }
 
 // ── Compiled graph singleton ────────────────────────────────────────────────
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AtheneGraph = CompiledStateGraph<typeof AtheneState.State, Partial<typeof AtheneState.State>, any>;
+type AtheneGraph = CompiledStateGraph<typeof AtheneState.State, Partial<typeof AtheneState.State>, unknown>;
 
 let _compiledGraph: AtheneGraph | null = null;
 let _compilingPromise: Promise<AtheneGraph> | null = null;
