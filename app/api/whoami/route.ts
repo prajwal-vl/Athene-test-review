@@ -1,42 +1,20 @@
-import { NextResponse } from "next/server";
-import { getContextFromHeaders, withRLS } from "@/lib/supabase/rls-client";
+import { NextResponse } from 'next/server'
+import { auth } from '@clerk/nextjs/server'
+import { resolveUserAccess } from '@/lib/auth/rbac'
 
-export async function GET(request: Request) {
-  const context = getContextFromHeaders(request.headers);
+export async function GET() {
+  const { userId, orgId, orgRole } = await auth()
 
-  if (!context) {
-    return NextResponse.json({ 
-      error: "Unauthorized or missing org context. Ensure you are signed into an organization." 
-    }, { status: 401 });
+  if (!userId || !orgId) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  try {
-    // Demonstrate full RLS chain by running a query through the wrapper
-    const result = await withRLS(context, async (supabase) => {
-      // This query is now RLS-protected by the session headers set in the wrapper
-      const { data: user } = await supabase
-        .from('org_members')
-        .select('*')
-        .eq('id', context.user_id)
-      
-      const { data: org } = await supabase
-        .from('organizations')
-        .select('*')
-        .eq('id', context.org_id)
+  const access = await resolveUserAccess(userId, orgId, orgRole)
 
-      return {
-        profile: user?.[0] || null,
-        organization: org?.[0] || null
-      };
-    });
-
-    return NextResponse.json({
-      message: "Full RLS chain verified.",
-      context,
-      data: result
-    });
-  } catch (error) {
-    console.error("Error in whoami route:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
-  }
+  return NextResponse.json({
+    user_id: userId,
+    org_id: orgId,
+    org_role: orgRole,
+    access,
+  })
 }

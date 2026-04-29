@@ -1,36 +1,32 @@
-import { supabaseAdmin } from "./server";
+import { createHash } from 'crypto'
+import { supabaseAdmin } from './server'
 
-export type AuditLogEntry = {
-  org_id: string;
-  admin_user_id: string;
-  action: string;
-  target_user_id?: string;
-  details?: any;
-};
-
-export async function writeAuditLog(entry: AuditLogEntry) {
-  const { error } = await supabaseAdmin
-    .from("admin_actions")
-    .insert([entry]);
-
-  if (error) {
-    console.error("[audit] writeAuditLog failed:", error.message);
-  }
+export interface CrossDeptAuditInput {
+  threadId: string
+  userId: string
+  orgId: string
+  queriedDeptIds: string[]
+  chunkIds: string[]
+  prompt: string
+  grantId: string | null
 }
 
-export async function writeGrantAccessAudit(entry: {
-  org_id: string;
-  user_id: string;
-  grant_id?: string;
-  scope_used: string;
-  document_ids: string[];
-  query_hash?: string;
-}) {
-  const { error } = await supabaseAdmin
-    .from("grant_access_audit")
-    .insert([entry]);
+export async function writeAuditLog(input: CrossDeptAuditInput): Promise<void> {
+  const promptHash = createHash('sha256').update(input.prompt).digest('hex')
+
+  const { error } = await supabaseAdmin.from('cross_dept_audit_log').insert({
+    org_id: input.orgId,
+    user_id: input.userId,
+    query: promptHash,
+    dept_ids: input.queriedDeptIds,
+    reason: JSON.stringify({
+      thread_id: input.threadId,
+      chunk_ids: input.chunkIds,
+      grant_id: input.grantId,
+    }),
+  })
 
   if (error) {
-    console.error("[audit] writeGrantAccessAudit failed:", error.message);
+    throw new Error(`Failed to write audit log: ${error.message}`)
   }
 }

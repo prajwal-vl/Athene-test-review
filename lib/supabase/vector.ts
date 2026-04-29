@@ -1,35 +1,66 @@
-import { withRLS, type RLSContext } from "./rls-client";
+import { withRLS } from './rls-client'
 
-export type SearchResult = {
-  id: string;
-  document_id: string;
-  content_preview: string;
-  metadata: Record<string, unknown>;
-  similarity: number;
-};
+export interface VectorChunk {
+  chunk_id: string
+  source_url: string | null
+  title: string | null
+  metadata: Record<string, unknown>
+  score: number
+}
 
-/**
- * Performs a vector similarity search within the RLS-protected context.
- * Uses withRLS() so Postgres session vars are set and grants are injected.
- */
 export async function similaritySearch(
-  context: RLSContext,
+  orgId: string,
+  userId: string,
   queryEmbedding: number[],
-  matchThreshold: number = 0.5,
-  matchCount: number = 10
-): Promise<SearchResult[]> {
-  return withRLS(context, async (supabase) => {
-    const { data, error } = await supabase.rpc("match_documents", {
-      query_embedding: queryEmbedding,
-      match_threshold: matchThreshold,
-      match_count: matchCount,
-    });
+  topK: number,
+  deptFilter?: string,
+): Promise<VectorChunk[]> {
+  return withRLS(orgId, userId, async (client) => {
+    let query = client
+      .from('document_embeddings')
+      .select('chunk_id, source_url, title, metadata, dept_id, embedding')
+      .limit(topK)
 
-    if (error) {
-      console.error("[vector] similaritySearch error:", error);
-      throw error;
+    if (deptFilter) {
+      query = query.eq('dept_id', deptFilter)
     }
 
-    return (data as SearchResult[]) || [];
-  });
+    const { data, error } = await query
+    if (error) throw error
+
+    // keep distance in DB for production rpc; placeholder score for scaffold
+    return (data ?? []).map((row) => ({
+      chunk_id: row.chunk_id,
+      source_url: (row as Record<string, unknown>).source_url as string | null,
+      title: (row as Record<string, unknown>).title as string | null,
+      metadata: (row as Record<string, unknown>).metadata as Record<string, unknown>,
+      score: 1,
+    }))
+  })
+}
+
+export async function crossDeptSearch(
+  orgId: string,
+  userId: string,
+  queryEmbedding: number[],
+  topK: number,
+  deptIds: string[],
+): Promise<VectorChunk[]> {
+  return withRLS(orgId, userId, async (client) => {
+    const { data, error } = await client
+      .from('document_embeddings')
+      .select('chunk_id, source_url, title, metadata, dept_id, embedding')
+      .in('dept_id', deptIds)
+      .limit(topK)
+
+    if (error) throw error
+
+    return (data ?? []).map((row) => ({
+      chunk_id: row.chunk_id,
+      source_url: (row as Record<string, unknown>).source_url as string | null,
+      title: (row as Record<string, unknown>).title as string | null,
+      metadata: (row as Record<string, unknown>).metadata as Record<string, unknown>,
+      score: 1,
+    }))
+  })
 }
