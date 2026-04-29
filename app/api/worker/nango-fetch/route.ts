@@ -48,6 +48,7 @@ import type { FetchedChunk } from '@/lib/integrations/base'
 import { microsoftFetcher } from '@/lib/integrations/microsoft/index'
 import { fetchJiraIssues } from '@/lib/integrations/atlassian/jira-fetcher'
 import { fetchConfluencePages } from '@/lib/integrations/atlassian/confluence-fetcher'
+import { getAppBaseUrl } from '@/lib/config/app-url'
 
 // ---- Provider Fetcher Map ---------------------------------------
 
@@ -157,8 +158,7 @@ export async function POST(request: Request): Promise<Response> {
     //    Fire-and-forget: graph build runs asynchronously after embedding.
     if (result.indexed > 0) {
       const docIds = [...new Set(allChunks.map((c) => c.chunk_id))]
-      const graphBuildUrl =
-        `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/api/worker/graph-build`
+      const graphBuildUrl = `${getAppBaseUrl()}/api/worker/graph-build`
       try {
         await qstash.publishJSON({
           url: graphBuildUrl,

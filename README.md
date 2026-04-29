@@ -79,3 +79,16 @@ npm run dev
 ```
 👉 Build verification: `npm run build`
 
+
+## Supabase migrations (ATH-20)
+Run in order on a fresh database:
+1. `supabase/migrations/001_schema.sql`
+2. `supabase/migrations/002_rls_policies.sql`
+3. `supabase/migrations/003_indexes.sql`
+4. `supabase/migrations/004_vector_indexes.sql`
+5. `supabase/migrations/005_org_api_keys.sql`
+6. `supabase/migrations/006_org_integrations.sql`
+7. `supabase/migrations/007_user_automations.sql`
+
+Then run policy checks with `supabase/tests/rls-policies.test.sql`.
+
