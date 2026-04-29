@@ -53,7 +53,7 @@ export const AGENT_REGISTRY = {
   retrieval_agent: {
     name:          "Retrieval Agent",
     minTier:       "simple",
-    allowedRoles:  ["member", "super_user", "admin"],
+    allowedRoles:  ["member", "bi_analyst", "super_user", "admin"],
     needsApproval: false,
     crossDept:     false,
   },
@@ -62,7 +62,7 @@ export const AGENT_REGISTRY = {
     name:          "Cross-Department Retrieval Agent",
     // Architecture doc §7: cross_dept agent is always ≥ complex
     minTier:       "complex",
-    allowedRoles:  ["super_user", "admin"],
+    allowedRoles:  ["bi_analyst", "super_user", "admin"],
     needsApproval: false,
     crossDept:     true,
   },
@@ -70,7 +70,7 @@ export const AGENT_REGISTRY = {
   email_agent: {
     name:          "Email Agent",
     minTier:       "medium",
-    allowedRoles:  ["member", "super_user", "admin"],
+    allowedRoles:  ["member", "bi_analyst", "super_user", "admin"],
     needsApproval: "write-only",
     crossDept:     false,
   },
@@ -78,7 +78,7 @@ export const AGENT_REGISTRY = {
   calendar_agent: {
     name:          "Calendar Agent",
     minTier:       "medium",
-    allowedRoles:  ["member", "super_user", "admin"],
+    allowedRoles:  ["member", "bi_analyst", "super_user", "admin"],
     needsApproval: "write-only",
     crossDept:     false,
   },
@@ -87,7 +87,7 @@ export const AGENT_REGISTRY = {
     name:          "Report Agent",
     minTier:       "medium",
     // Reports aggregate data across departments — restricted to elevated roles
-    allowedRoles:  ["super_user", "admin"],
+    allowedRoles:  ["bi_analyst", "super_user", "admin"],
     needsApproval: false,
     crossDept:     true,
   },

@@ -24,7 +24,7 @@ import { Annotation, MessagesAnnotation } from "@langchain/langgraph";
 // ─── Domain value types ────────────────────────────────────────────────────
 
 /** User roles recognised throughout the system */
-export type UserRole = "member" | "super_user" | "admin";
+export type UserRole = "member" | "bi_analyst" | "super_user" | "admin";
 
 /** LLM complexity tier used by the supervisor to select model */
 export type Complexity = "simple" | "medium" | "complex";
@@ -133,10 +133,15 @@ export const AtheneState = Annotation.Root({
 
   // ── Identity (immutable after request start) ──────────────────────────
   //
-  // NOTE: thread_id is deliberately absent.
+  // Thread id is persisted in state for compatibility with existing nodes/tests.
   // LangGraph owns thread_id via RunnableConfig.configurable.thread_id.
   // Storing it here risks a silent mismatch (state value vs. checkpoint key).
   // Node functions should read thread_id from config.configurable.thread_id.
+
+  thread_id: Annotation<string>({
+    reducer: (_x, y) => y,
+    default: () => "",
+  }),
 
   /** Internal Supabase org UUID */
   org_id: Annotation<string>({
