@@ -1,85 +1,81 @@
-import { SystemMessage } from "@langchain/core/messages";
-import type { MessageContentComplex } from "@langchain/core/messages";
-import type { AtheneStateType, AtheneStateUpdate, CitedSource, RetrievedChunk } from "../langgraph/state";
-import { resolveModelClient } from "../langgraph/llm-factory";
+import { readFileSync } from 'fs'
+import { join } from 'path'
+import { SystemMessage } from '@langchain/core/messages'
+import type { MessageContentComplex } from '@langchain/core/messages'
+import type {
+  AtheneStateType,
+  AtheneStateUpdate,
+  CitedSource,
+  RetrievedChunk,
+} from '../langgraph/state'
+import { resolveModelClient } from '../langgraph/llm-factory'
 
-const SYNTHESIS_PROMPT = `You are an AI assistant synthesizing retrieved information into a clear, cited answer.
+const REFUSAL = "I don't have enough info in your connected sources."
 
-MODE: {{MODE}}
+function loadPromptTemplate(): string {
+  const promptPath = join(process.cwd(), 'lib/agents/prompts/synthesis.md')
+  try {
+    return readFileSync(promptPath, 'utf8')
+  } catch {
+    throw new Error('Synthesis prompt file missing')
+  }
+}
 
-CONTEXT (retrieved chunks):
-{{CONTEXT}}
+function toContext(chunks: RetrievedChunk[]): string {
+  return chunks
+    .map((c) => `[${c.document_id}]\n${c.content_preview}`)
+    .join('\n\n---\n\n')
+}
 
-INSTRUCTIONS:
-- Answer the user's question using ONLY the provided context.
-- Cite sources inline using [document_id] format.
-- If the context is insufficient, say so clearly.
-- In BI mode: focus on patterns, trends, and data gaps with structured bullets.
-- In standard mode: provide a direct, readable answer.`;
+function parseText(content: unknown): string {
+  if (typeof content === 'string') return content
+  if (Array.isArray(content)) {
+    return (content as MessageContentComplex[])
+      .map((part) =>
+        typeof part === 'string'
+          ? part
+          : ((part as { text?: string }).text ?? ''),
+      )
+      .join('')
+  }
+  return ''
+}
 
-export async function synthesisAgentNode(
-  state: AtheneStateType,
-): Promise<AtheneStateUpdate> {
-  const { retrieved_chunks, messages, task_type, is_cross_dept_query } = state;
+function extractCitations(answer: string, chunks: RetrievedChunk[]): CitedSource[] {
+  const ids = Array.from(new Set([...answer.matchAll(/\[([a-zA-Z0-9_-]+)\]/g)].map((m) => m[1])))
+  return ids.flatMap((id) => {
+    const chunk = chunks.find((c) => c.document_id === id)
+    if (!chunk) return []
+    return [
+      {
+        document_id: chunk.document_id,
+        title: null,
+        external_url: chunk.external_url,
+        chunk_index: chunk.chunk_index,
+        source_type: chunk.source_type,
+      },
+    ]
+  })
+}
 
-  if (!retrieved_chunks || retrieved_chunks.length === 0) {
-    return {
-      final_answer: "I don't have enough information in your connected sources to answer that.",
-      cited_sources: [],
-      retrieved_chunks: [],
-    };
+export async function synthesisAgentNode(state: AtheneStateType): Promise<AtheneStateUpdate> {
+  const chunks = state.retrieved_chunks ?? []
+  if (chunks.length === 0) {
+    return { final_answer: REFUSAL, cited_sources: [], retrieved_chunks: [] }
   }
 
-  const isBIMode = task_type === "cross_dept_retrieval" || is_cross_dept_query === true;
-  const mode = isBIMode ? "BI (BUSINESS INTELLIGENCE) MODE" : "STANDARD MODE";
+  const mode = state.is_cross_dept_query || state.task_type === 'cross_dept_retrieval' ? 'BI' : 'STANDARD'
+  const prompt = loadPromptTemplate()
+    .replace('{{MODE}}', mode)
+    .replace('{{CONTEXT}}', toContext(chunks))
 
-  const context = retrieved_chunks
-    .map((c: RetrievedChunk) => `[document_id: ${c.document_id}]\nContent: ${c.content_preview}`)
-    .join("\n\n---\n\n");
-
-  const systemPrompt = SYNTHESIS_PROMPT
-    .replace("{{MODE}}", mode)
-    .replace("{{CONTEXT}}", context);
-
-  const { client } = await resolveModelClient(state.org_id, state.complexity ?? "simple");
-  const response = await client.invoke([
-    new SystemMessage(systemPrompt),
-    ...messages,
-  ]);
-
-  const finalAnswer =
-    typeof response.content === "string"
-      ? response.content
-      : (response.content as MessageContentComplex[])
-          .map((c: MessageContentComplex) =>
-            typeof c === "string" ? c : (c as { type: string; text?: string }).text ?? ""
-          )
-          .join("");
-
-  const cited_sources = extractCitations(finalAnswer, retrieved_chunks);
+  const { client } = await resolveModelClient(state.org_id, state.complexity ?? 'simple', 'medium')
+  const response = await client.invoke([new SystemMessage(prompt), ...state.messages])
+  const finalAnswer = parseText(response.content).trim() || REFUSAL
 
   return {
     final_answer: finalAnswer,
-    cited_sources,
+    cited_sources: extractCitations(finalAnswer, chunks),
     retrieved_chunks: [],
-  };
-}
-
-function extractCitations(text: string, chunks: RetrievedChunk[]): CitedSource[] {
-  const docIdRegex = /\[([a-zA-Z0-9_-]+)\]/g;
-  const uniqueDocIds = Array.from(
-    new Set([...text.matchAll(docIdRegex)].map((m) => m[1]))
-  );
-
-  return uniqueDocIds.flatMap((docId): CitedSource[] => {
-    const chunk = chunks.find((c: RetrievedChunk) => c.document_id === docId);
-    if (!chunk) return [];
-    return [{
-      document_id: chunk.document_id,
-      title: null,
-      external_url: chunk.external_url,
-      chunk_index: chunk.chunk_index,
-      source_type: chunk.source_type,
-    }];
-  });
+  }
 }
