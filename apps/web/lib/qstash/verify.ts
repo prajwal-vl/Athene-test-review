@@ -16,3 +16,14 @@ export async function verifyQStashSignature(req: Request): Promise<boolean> {
     return false
   }
 }
+
+/** @deprecated alias for verifyQStashSignature */
+export async function verifyQStashRequest(req: Request, body?: string): Promise<boolean> {
+    const signature = req.headers.get('upstash-signature')
+    if (!signature) return false
+    try {
+        return await receiver.verify({ signature, body: body || await req.clone().text(), url: req.url })
+    } catch {
+        return false
+    }
+}

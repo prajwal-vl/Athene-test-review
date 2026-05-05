@@ -99,6 +99,29 @@ export class SupabaseCheckpointer extends BaseCheckpointSaver {
       },
     };
   }
+
+  /**
+   * Convenience method for the API routes to get the full state without a RunnableConfig.
+   */
+  async loadLatest(threadId: string): Promise<any | null> {
+    const { data, error } = await supabaseAdmin
+      .from("langgraph_checkpoints")
+      .select("checkpoint, org_id, user_id")
+      .eq("thread_id", threadId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error || !data) return null;
+    
+    // The state is nested in the checkpoint.channel_values
+    const checkpoint = data.checkpoint as any;
+    return {
+        ...checkpoint.channel_values,
+        org_id: data.org_id,
+        user_id: data.user_id,
+    };
+  }
 }
 
 // Singleton export

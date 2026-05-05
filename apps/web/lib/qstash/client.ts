@@ -4,6 +4,28 @@ import { supabaseAdmin } from '@/lib/supabase/server'
 
 export const qstash = new Client({ token: process.env.QSTASH_TOKEN! })
 
+export function getQStashClient() {
+  return qstash;
+}
+
+export async function publishIndexJob(args: {
+    threadId: string;
+    orgId: string;
+    userId: string;
+    toolCallId: string;
+    toolArgs: any;
+}) {
+    const res = await qstash.publishJSON({
+        url: `${process.env.NEXT_PUBLIC_APP_URL}/api/worker/nango-fetch`,
+        body: {
+            ...args,
+            source_type: args.toolArgs.source_type,
+            source_id: args.toolArgs.source_id,
+        },
+    });
+    return res.messageId;
+}
+
 const CONCURRENCY_LIMIT = 3
 const CONCURRENCY_TTL_SECONDS = 900
 
