@@ -12,7 +12,7 @@ export async function POST(req: Request) {
   const userId = String(body.user_id || "");
   if (!orgId || !userId) return Response.json({ error: "org_id and user_id are required" }, { status: 400 });
   const llm = await resolveModelClient(orgId, "medium");
-  const result = await llm.invoke([
+  const result = await llm.client.invoke([
     ["system", "Create a concise morning briefing only from provider summaries supplied by workers. Do not invent missing items."],
     ["human", JSON.stringify(body.inputs || {})],
   ]);

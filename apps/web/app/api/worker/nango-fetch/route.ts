@@ -5,7 +5,7 @@ import { withNangoAccess, type SourceType } from "@/lib/nango/client";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { getRedis } from "@/lib/redis/client";
 import { requireEnv } from "@/lib/env";
-import { fetchGoogleDriveDocument } from "@/lib/integrations/google/drive-fetcher";
+import { fetchDriveFileContent } from "@/lib/integrations/google/drive-fetcher";
 import { fetchSharePointDocument } from "@/lib/integrations/microsoft/sharepoint-fetcher";
 
 export const runtime = "nodejs";
@@ -16,9 +16,20 @@ function chunkText(text: string, size = 2200, overlap = 260) {
   return chunks.filter((chunk) => chunk.trim().length > 0);
 }
 
-async function fetchBySource(sourceType: SourceType, token: string, sourceId: string) {
-  if (sourceType === "gdrive") return fetchGoogleDriveDocument(token, sourceId);
-  if (sourceType === "sharepoint" || sourceType === "onedrive") return fetchSharePointDocument(token, sourceId);
+async function fetchBySource(sourceType: SourceType, token: string, connectionId: string, orgId: string, sourceId: string) {
+  if (sourceType === "gdrive") {
+      // Note: we need the mimeType here, but for now we'll assume Google Doc or fetch metadata
+      return { 
+          content: await fetchDriveFileContent(connectionId, orgId, sourceId, 'application/vnd.google-apps.document'), 
+          title: 'Document', 
+          sourceUrl: `https://drive.google.com/file/d/${sourceId}`,
+          author: null,
+          lastModified: null
+      };
+  }
+  if (sourceType === "sharepoint" || sourceType === "onedrive") {
+      return fetchSharePointDocument(token, sourceId);
+  }
   throw new Error(`Indexer fetch is not configured for ${sourceType}`);
 }
 
@@ -61,7 +72,7 @@ export async function POST(req: Request) {
     if (error) throw error;
 
     const indexed = await withNangoAccess(sourceType, integration.nango_connection_id, async (token) => {
-      let doc = await fetchBySource(sourceType, token, sourceId);
+      let doc = await fetchBySource(sourceType, token, integration.nango_connection_id, orgId, sourceId);
       let chunks = chunkText(doc.content);
       const embeddings = await openai.embeddings.create({ model: "text-embedding-3-small", input: chunks });
       const rows = chunks.map((chunk, index) => ({

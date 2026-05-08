@@ -1,6 +1,6 @@
 import { requireIdentity, jsonError } from "@/lib/api/auth";
 import { SupabaseCheckpointer } from "@/lib/langgraph/checkpointer";
-import { publishIndexJob } from "@/lib/langgraph/nodes/async-tool-node";
+import { publishIndexJob } from "@/lib/qstash/client";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
