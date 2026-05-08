@@ -9,7 +9,6 @@ const requiredServerEnv = [
   "UPSTASH_REDIS_REST_URL",
   "UPSTASH_REDIS_REST_TOKEN",
   "OPENAI_API_KEY",
-  "ENCRYPTION_SECRET",
   "NEXT_PUBLIC_APP_URL",
 ] as const;
 

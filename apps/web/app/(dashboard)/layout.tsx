@@ -96,7 +96,7 @@ export default function DashboardLayout({
             </aside>
 
             {/* Main Content Wrapper */}
-            <div className="flex-1 flex flex-col h-full relative overflow-hidden">
+            <div className="flex-1 flex flex-col min-h-0 relative">
 
                 {/* Top Header */}
                 <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-6 shrink-0 z-10">
@@ -129,10 +129,11 @@ export default function DashboardLayout({
                 </header>
 
                 {/* Scrollable Page Content */}
-                <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+                <main className="flex-1 overflow-y-auto bg-slate-50 p-4 sm:p-6 lg:p-8 min-h-0">
                     {children}
                 </main>
             </div>
+
 
         </div>
     );

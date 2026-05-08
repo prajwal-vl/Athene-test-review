@@ -23,6 +23,14 @@ cd Athene-test-review
 pnpm install
 ```
 
+This will automatically install all required packages from `package.json`, including:
+- **Authentication**: `@clerk/nextjs`
+- **Database**: `@supabase/supabase-js`
+- **AI/LLM Orchestration**: `@langchain/langgraph`, `@langchain/core`, `openai`, and model providers (`@langchain/openai`, `@langchain/anthropic`, etc.)
+- **Integrations**: `@nangohq/frontend`, `@nangohq/node`
+- **Caching/Background Jobs**: `@upstash/redis`, `@upstash/qstash`
+- **UI Components**: `shadcn`, `tailwindcss`, `lucide-react`, `@base-ui/react`
+
 **3. Configure environment variables**
 
 Create a `.env.local` file in the project root:
