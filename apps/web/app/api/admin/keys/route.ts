@@ -4,6 +4,21 @@ import { requireEnv } from "@/lib/env";
 
 export const runtime = "nodejs";
 
+export async function GET(req: Request) {
+  try {
+    const { identity } = await requireAdmin(req);
+    const { data, error } = await createSupabaseServiceClient()
+      .from("org_api_keys")
+      .select("id, provider, label, key_hint, is_active, created_at")
+      .eq("org_id", identity.orgId)
+      .eq("is_active", true);
+    if (error) throw error;
+    return Response.json(data);
+  } catch (error) {
+    return jsonError(error);
+  }
+}
+
 export async function POST(req: Request) {
   try {
     const { identity } = await requireAdmin(req);
@@ -14,27 +29,30 @@ export async function POST(req: Request) {
     if (!provider || !rawKey) return Response.json({ error: "provider and key are required" }, { status: 400 });
     const supabase = createSupabaseServiceClient();
     
-    // Set the KMS secret in the DB session context
-    await supabase.rpc("set_config_value", { 
-        name: "app.kms_key", 
-        value: requireEnv("ENCRYPTION_SECRET")
-    });
+    const secret = process.env.ENCRYPTION_SECRET || process.env.KMS_SECRET;
+    if (!secret) {
+        return Response.json({ error: "Missing required environment variable for encryption" }, { status: 500 });
+    }
 
-    const { data: encryptedKey, error: encryptError } = await supabase.rpc("encrypt_llm_key", { 
-        plaintext_key: rawKey 
+    // Use encrypt_key(p_key, p_secret) — defined in migration 002_rls_policies.sql
+    const { data: encryptedKey, error: encryptError } = await supabase.rpc("encrypt_key", { 
+        p_key: rawKey,
+        p_secret: secret
     });
 
     if (encryptError) throw encryptError;
 
-    const { data, error } = await supabase.from("llm_keys").upsert({
+    // Table: org_api_keys (migration 001_schema.sql)
+    // Columns: encrypted_key, added_by (not key_encrypted, created_by)
+    const { data, error } = await supabase.from("org_api_keys").upsert({
       org_id: identity.orgId,
       provider,
       label,
-      key_encrypted: encryptedKey,
+      encrypted_key: encryptedKey,
       key_hint: rawKey.slice(-4),
       custom_endpoint: body.custom_endpoint || null,
       is_active: true,
-      created_by: identity.userId,
+      added_by: identity.userId,
     }, { onConflict: "org_id,provider" }).select("id, provider, label, key_hint, is_active").single();
     if (error) throw error;
     return Response.json(data);

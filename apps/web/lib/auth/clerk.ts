@@ -19,21 +19,32 @@ function normalizeRole(role: unknown): UserRole {
 
 export function extractOrgClaims(payload: Record<string, unknown>): AtheneIdentity {
   const userId = String(payload.sub || "");
-  const orgId = String(payload.org_id || payload.orgId || payload.o || "");
-  const orgRole = String(payload.org_role || payload.role || "");
+  const rawO = payload.o as Record<string, unknown> | string | undefined;
+  let oId = "", oRole = "", oSlug = "";
+  if (typeof rawO === "object" && rawO !== null) {
+    oId = String(rawO.id || "");
+    oRole = String(rawO.rol || "");
+    oSlug = String(rawO.slg || "");
+  } else if (typeof rawO === "string") {
+    oId = rawO;
+  }
+
+  const orgId = String(payload.org_id || payload.orgId || oId || "");
+  const orgRole = String(payload.org_role || oRole || payload.role || "");
+  const orgSlug = typeof payload.org_slug === "string" ? payload.org_slug : (oSlug || null);
   
   if (!userId || !orgId) {
-    console.error("[clerk-auth] Missing claims:", { userId, orgId, keys: Object.keys(payload) });
+    console.error("[clerk-auth] Missing claims. Full payload:", JSON.stringify(payload));
     throw new Error("Clerk token is missing user or organization claims");
   }
   
-  console.log(`[clerk-auth] Resolved: user=${userId} org=${orgId} role=${orgRole} keys=${Object.keys(payload).join(',')}`);
+  console.log(`[clerk-auth] Resolved: user=${userId} org=${orgId} role=${orgRole} rawPayload=${JSON.stringify(payload)}`);
   
   return {
     userId,
     orgId,
     orgRole: normalizeRole(orgRole),
-    orgSlug: typeof payload.org_slug === "string" ? payload.org_slug : null,
+    orgSlug,
     email: typeof payload.email === "string" ? payload.email : null,
     exp: Number(payload.exp || 0),
   };
