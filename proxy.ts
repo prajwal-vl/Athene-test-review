@@ -3,7 +3,13 @@ import { resolveUserAccess } from "@/lib/auth/rbac";
 import { NextResponse } from "next/server";
 
 // Define routes that should NOT be protected
-const isPublicRoute = createRouteMatcher(["/", "/sign-in(.*)", "/sign-up(.*)"]);
+const isPublicRoute = createRouteMatcher([
+  "/",
+  "/sign-in(.*)",
+  "/sign-up(.*)",
+  "/api/webhooks(.*)",  // Clerk/Svix — signature verified inside handler
+  "/api/worker(.*)",   // QStash workers — signature verified inside handler
+])
 
 /**
  * Clerk Middleware (proxy.ts — Next.js 16 convention)

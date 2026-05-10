@@ -1,16 +1,26 @@
 import { auth } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
+import { mapRole } from '@/lib/auth/clerk'
+import { supabaseAdmin } from '@/lib/supabase/server'
 
 export async function GET() {
-  const { userId, orgId } = await auth()
-  
-  if (!userId) {
-    return new Response('Unauthorized', { status: 401 })
+  const { userId, orgId, orgRole } = await auth()
+  if (!userId || !orgId) return new NextResponse('Unauthorized', { status: 401 })
+
+  const role = mapRole(orgRole ?? undefined)
+  if (role !== 'admin') return new NextResponse('Forbidden', { status: 403 })
+
+  const { data, error } = await supabaseAdmin
+    .from('audit_logs')
+    .select('*')
+    .eq('org_id', orgId)
+    .order('created_at', { ascending: false })
+    .limit(200)
+
+  if (error) {
+    console.error('[audit-log] Failed to fetch:', error.message)
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
-  
-  return NextResponse.json({ 
-    status: 'ok',
-    userId,
-    orgId
-  })
+
+  return NextResponse.json({ logs: data ?? [] })
 }

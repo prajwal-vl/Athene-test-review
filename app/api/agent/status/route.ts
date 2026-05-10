@@ -47,15 +47,25 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const values = currentState.values as any;
-    if (values.orgId !== clerkOrgId || values.userId !== clerkUserId) {
+    interface StateValues {
+      org_id?: string
+      user_id?: string
+      run_status?: string
+      task_type?: string | null
+      final_answer?: string | null
+      awaiting_approval?: boolean
+      pending_write_action?: Record<string, unknown> | null
+      cited_sources?: unknown[]
+    }
+    const values = currentState.values as StateValues
+    if (values.org_id !== clerkOrgId || values.user_id !== clerkUserId) {
       return NextResponse.json(
         { error: "Thread not found or access denied" },
         { status: 403 }
       );
     }
 
-    let status = values.run_status || "idle";
+    let status = values.run_status ?? "idle"
 
     // Determine if the graph has completely finished
     // currentState.next is empty when graph reaches END
@@ -75,8 +85,8 @@ export async function GET(request: NextRequest) {
         cited_sources: values.cited_sources || [],
       },
     });
-  } catch (error: any) {
-    console.error("[AgentStatus] Error fetching status:", error);
+  } catch (error: unknown) {
+    console.error("[AgentStatus] Error fetching status:", error instanceof Error ? error.message : error)
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
