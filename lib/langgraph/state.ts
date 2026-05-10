@@ -215,6 +215,25 @@ export const AtheneState = Annotation.Root({
     default: () => [],
   }),
 
+  /**
+   * Formatted knowledge-graph context string produced by the retrieval agent.
+   * Contains entity list + relationship triples (e.g. "Project X → USES → AWS EKS [EXTRACTED]").
+   * Cleared after synthesis alongside retrieved_chunks.
+   */
+  graph_context: Annotation<string | null>({
+    reducer: (_x, y) => y,
+    default: () => null,
+  }),
+
+  /**
+   * True when graph BFS traversal was cut off by RLS (org/dept boundary reached).
+   * Synthesis agent appends a boundary note to the response when true.
+   */
+  graph_boundary_reached: Annotation<boolean>({
+    reducer: (_x, y) => y,
+    default: () => false,
+  }),
+
   // ── Routing / tracing helpers ────────────────────────────────────────
   /**
    * Number of supervisor→agent hops in the current run.

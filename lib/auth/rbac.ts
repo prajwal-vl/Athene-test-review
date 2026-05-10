@@ -2,6 +2,9 @@ import { redis } from '@/lib/redis/client'
 import { supabaseAdmin } from '@/lib/supabase/server'
 import { mapRole, type AppRole } from './clerk'
 
+// Broader role union used by UI components (includes super_user for internal tooling)
+export type UserRole = AppRole | 'super_user'
+
 export interface UserAccess {
   role: AppRole | null
   dept_id: string | null

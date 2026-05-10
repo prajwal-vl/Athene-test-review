@@ -1,10 +1,10 @@
-import { BaseCheckpointSaver, Checkpoint, CheckpointMetadata, CheckpointTuple, SerializerProtocol } from "@langchain/langgraph";
+import { BaseCheckpointSaver, Checkpoint, CheckpointMetadata, CheckpointTuple } from "@langchain/langgraph";
 import type { RunnableConfig } from "@langchain/core/runnables";
 import { supabaseAdmin } from "../supabase/server";
 
 export class SupabaseCheckpointer extends BaseCheckpointSaver {
-  constructor(serde?: SerializerProtocol) {
-    super(serde);
+  constructor() {
+    super();
   }
 
   async getTuple(config: RunnableConfig): Promise<CheckpointTuple | undefined> {
@@ -24,21 +24,16 @@ export class SupabaseCheckpointer extends BaseCheckpointSaver {
     return {
       config,
       checkpoint: data.checkpoint as Checkpoint,
-      metadata: {},
+      metadata: { source: 'loop' as const, step: 0, parents: {} },
     };
   }
 
-  async list(
+  async *list(
     config: RunnableConfig,
-    _filter?: Record<string, unknown>,
-    _before?: RunnableConfig,
-    limit?: number
-  ): Promise<AsyncGenerator<CheckpointTuple>> {
+    _options?: { limit?: number; before?: RunnableConfig; filter?: Record<string, unknown> }
+  ): AsyncGenerator<CheckpointTuple> {
     const thread_id = config.configurable?.thread_id;
-    if (!thread_id) {
-      async function* empty() {}
-      return empty();
-    }
+    if (!thread_id) return;
 
     let query = supabaseAdmin
       .from("langgraph_checkpoints")
@@ -46,31 +41,27 @@ export class SupabaseCheckpointer extends BaseCheckpointSaver {
       .eq("thread_id", thread_id)
       .order("created_at", { ascending: false });
 
-    if (limit) {
-      query = query.limit(limit);
+    if (_options?.limit) {
+      query = query.limit(_options.limit);
     }
 
     const { data, error } = await query;
-
-    async function* generate() {
-      if (!error && data) {
-        for (const row of data) {
-          yield {
-            config,
-            checkpoint: row.checkpoint as Checkpoint,
-            metadata: {},
-          };
-        }
+    if (!error && data) {
+      for (const row of data) {
+        yield {
+          config,
+          checkpoint: row.checkpoint as Checkpoint,
+          metadata: { source: 'loop' as const, step: 0, parents: {} },
+        };
       }
     }
-
-    return generate();
   }
 
   async put(
     config: RunnableConfig,
     checkpoint: Checkpoint,
-    _metadata: CheckpointMetadata
+    _metadata: CheckpointMetadata,
+    _newVersions?: Record<string, unknown>
   ): Promise<RunnableConfig> {
     const thread_id = config.configurable?.thread_id;
     const org_id = config.configurable?.org_id;
@@ -98,6 +89,21 @@ export class SupabaseCheckpointer extends BaseCheckpointSaver {
         checkpoint_id: checkpoint.id,
       },
     };
+  }
+
+  async putWrites(
+    _config: RunnableConfig,
+    _writes: [string, unknown][],
+    _taskId: string
+  ): Promise<void> {
+    // No-op: write-through is handled by put()
+  }
+
+  async deleteThread(_threadId: string): Promise<void> {
+    await supabaseAdmin
+      .from("langgraph_checkpoints")
+      .delete()
+      .eq("thread_id", _threadId);
   }
 }
 

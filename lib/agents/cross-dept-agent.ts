@@ -15,7 +15,7 @@
 // ============================================================
 
 import { ToolNode } from '@langchain/langgraph/prebuilt'
-import { ToolMessage } from '@langchain/core/messages'
+import { AIMessage, ToolMessage } from '@langchain/core/messages'
 import type { RunnableConfig } from '@langchain/core/runnables'
 import { supabaseAdmin } from '@/lib/supabase/server'
 import { crossDeptVectorSearchTool } from '@/lib/tools/registry'
@@ -36,11 +36,7 @@ export async function crossDeptAgent(
   if (user_role !== 'super_user' && user_role !== 'admin') {
     return {
       messages: [
-        {
-          role: 'assistant',
-          content:
-            'Access Denied: Cross-department analysis is restricted to BI Analysts.',
-        },
+        new AIMessage('Access Denied: Cross-department analysis is restricted to BI Analysts.'),
       ],
     }
   }
@@ -66,8 +62,8 @@ export async function crossDeptAgent(
   const retrievedDocs: Array<{
     chunk_id?: string
     metadata?: { department_id?: string }
-  }> = result.messages
-    .filter((m): m is ToolMessage => m instanceof ToolMessage)
+  }> = (result.messages as ToolMessage[])
+    .filter((m: ToolMessage) => m instanceof ToolMessage)
     .flatMap((m: ToolMessage) => {
       try {
         return JSON.parse(m.content as string)

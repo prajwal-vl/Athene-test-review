@@ -26,7 +26,9 @@ export async function verifyClerkJWT(authHeader: string) {
   if (!token) throw new Response('Missing bearer token', { status: 401 })
 
   try {
-    const payload = await verifyToken(token)
+    const payload = await verifyToken(token, {
+      secretKey: process.env.CLERK_SECRET_KEY ?? '',
+    })
     return {
       userId: payload.sub ?? '',
       orgId: (payload as Record<string, unknown>).org_id as string | undefined,

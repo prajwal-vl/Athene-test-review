@@ -140,16 +140,19 @@ async function fetchByokKey(orgId: string): Promise<ByokResult | null> {
 
 // ─── Client instantiation ──────────────────────────────────────────────────
 
-function buildAnthropicClient(apiKey: string, model: string): ChatAnthropic {
-  return new ChatAnthropic({ apiKey, model, temperature: 0 });
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function buildAnthropicClient(apiKey: string, model: string): BaseChatModel {
+  return new ChatAnthropic({ apiKey, model, temperature: 0 }) as unknown as BaseChatModel;
 }
 
-function buildOpenAIClient(apiKey: string, model: string): ChatOpenAI {
-  return new ChatOpenAI({ apiKey, modelName: model, temperature: 0 });
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function buildOpenAIClient(apiKey: string, model: string): BaseChatModel {
+  return new ChatOpenAI({ apiKey, modelName: model, temperature: 0 }) as unknown as BaseChatModel;
 }
 
-function buildGoogleClient(apiKey: string, model: string): ChatGoogleGenerativeAI {
-  return new ChatGoogleGenerativeAI({ apiKey, model, temperature: 0 });
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function buildGoogleClient(apiKey: string, model: string): BaseChatModel {
+  return new ChatGoogleGenerativeAI({ apiKey, model, temperature: 0 }) as unknown as BaseChatModel;
 }
 
 function buildPlatformClient(provider: LLMProvider, model: string): BaseChatModel {

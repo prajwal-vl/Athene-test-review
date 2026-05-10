@@ -107,7 +107,7 @@ export async function emailAgentNode(
 ): Promise<AtheneStateUpdate> {
   const prompt = buildPrompt(state);
 
-  const llm = getModel("medium");
+  const llm = getModel();
 
   const response = await llm.invoke([
     { role: "system", content: prompt },

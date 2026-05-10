@@ -24,9 +24,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // 2. Resolve internal user ID
+    // 2. Resolve user access (validates org membership)
     const access = await resolveUserAccess(clerkUserId, clerkOrgId);
-    if (!access.internal_user_id) {
+    if (!access.role) {
       return NextResponse.json(
         { error: "User not found in organization" },
         { status: 403 }

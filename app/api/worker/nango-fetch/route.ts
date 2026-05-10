@@ -67,6 +67,94 @@ const providerFetcherMap: Record<string, FetcherFn[]> = {
     async (connectionId, orgId) => fetchSlackMessages(connectionId, orgId),
   ],
 
+  'google-drive': [
+    async (connectionId, orgId) => fetchDriveChunks(connectionId, orgId),
+  ],
+
+  gmail: [
+    // Full-sync: fetch recent emails (broad query, last 90 days)
+    async (connectionId, orgId) => searchEmailChunks(connectionId, orgId, 'newer_than:90d', 50),
+  ],
+
+  'google-calendar': [
+    // Full-sync: fetch events from 30 days ago to 90 days ahead
+    async (connectionId, orgId) => {
+      const timeMin = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+      const timeMax = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000)
+      return fetchCalendarChunks(connectionId, orgId, timeMin, timeMax)
+    },
+  ],
+
+  hubspot: [
+    async (connectionId, orgId) => {
+      const [companies, contacts, deals, notes] = await Promise.all([
+        fetchHubSpotCompanies(connectionId, orgId),
+        fetchHubSpotContacts(connectionId, orgId),
+        fetchHubSpotDeals(connectionId, orgId),
+        fetchHubSpotNotes(connectionId, orgId),
+      ])
+      return [...companies, ...contacts, ...deals, ...notes]
+    },
+  ],
+
+  notion: [
+    async (connectionId, orgId) => {
+      const [pages, databases] = await Promise.all([
+        fetchAllPages(connectionId, orgId),
+        fetchAllDatabases(connectionId, orgId),
+      ])
+      return [...pages, ...databases]
+    },
+  ],
+
+  salesforce: [
+    async (connectionId, orgId) => {
+      const metadata = await getProviderMetadata(connectionId, 'salesforce', orgId)
+      const instanceUrl = metadata.instance_url as string | undefined
+      if (!instanceUrl) {
+        throw new Error(`Salesforce instance_url not found for connection ${connectionId}`)
+      }
+      const [accounts, cases, opportunities] = await Promise.all([
+        fetchSalesforceAccounts(connectionId, instanceUrl, orgId),
+        fetchSalesforceCases(connectionId, instanceUrl, orgId),
+        fetchSalesforceOpportunities(connectionId, instanceUrl, orgId),
+      ])
+      return [...accounts, ...cases, ...opportunities]
+    },
+  ],
+
+  snowflake: [
+    async (connectionId, orgId) => fetchSnowflakeSamples(connectionId, orgId),
+  ],
+
+  github: [
+    async (connectionId, orgId) => {
+      const metadata = await getProviderMetadata(connectionId, 'github', orgId)
+      const owner = metadata.owner as string | undefined
+      const repo = metadata.repo as string | undefined
+      if (!owner || !repo) {
+        throw new Error(`GitHub owner/repo not found for connection ${connectionId}`)
+      }
+      const [issues, prs, wiki] = await Promise.all([
+        githubIssuesFetcher(connectionId, orgId, owner, repo),
+        githubPrsFetcher(connectionId, orgId, owner, repo),
+        githubWikiFetcher(connectionId, orgId, owner, repo),
+      ])
+      return [...issues, ...prs, ...wiki]
+    },
+  ],
+
+  linear: [
+    async (connectionId, orgId) => {
+      const [issues, cycles, projects] = await Promise.all([
+        linearIssuesFetcher(connectionId, orgId),
+        linearCyclesFetcher(connectionId, orgId),
+        linearProjectsFetcher(connectionId, orgId),
+      ])
+      return [...issues, ...cycles, ...projects]
+    },
+  ],
+
   zendesk: [
     async (connectionId, orgId) => {
       const metadata = await getProviderMetadata(connectionId, 'zendesk', orgId)

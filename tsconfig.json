@@ -33,6 +33,7 @@
   "exclude": [
     "node_modules",
     "scratch",
+    "apps",
     "vitest.config.ts",
     "lib/integrations/atlassian/__tests__/**",
     "lib/tools/__tests__/vector-search.test.ts",

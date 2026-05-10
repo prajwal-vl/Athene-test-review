@@ -88,13 +88,18 @@ export async function getAgentGraph(): Promise<AtheneGraph> {
     workflow.addNode("synthesis_agent",     synthesisAgent);
 
     // ── Step 2: Wire edges ────────────────────────────────────────────
+    // Cast to any: LangGraph 1.x accumulates the node-name union type via
+    // the *return value* of addNode(), but the mutation-style calls above
+    // discard those values, leaving N unresolved for addEdge/addConditionalEdges.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const wf = workflow as any;
 
-    workflow.addEdge(START, "supervisor");
+    wf.addEdge(START, "supervisor");
 
     // Supervisor routes to a worker, the HITL path, or terminal synthesis.
-    workflow.addConditionalEdges(
+    wf.addConditionalEdges(
       "supervisor",
-      (state) => state.next || "FINISH",
+      (state: typeof AtheneState.State) => state.next || "FINISH",
       {
         retrieval_agent:  "retrieval_agent",
         cross_dept_agent: "cross_dept_agent",
@@ -116,19 +121,19 @@ export async function getAgentGraph(): Promise<AtheneGraph> {
       "calendar_agent",
       "report_agent",
       "data_index_agent",
-    ] as const) {
-      workflow.addEdge(node, "supervisor");
+    ]) {
+      wf.addEdge(node, "supervisor");
     }
 
     // HITL path: approval_node → action_executor → synthesis_agent
-    workflow.addEdge("approval_node",   "action_executor");
-    workflow.addEdge("action_executor", "synthesis_agent");
+    wf.addEdge("approval_node",   "action_executor");
+    wf.addEdge("action_executor", "synthesis_agent");
 
     // Synthesis is always the terminal node
-    workflow.addEdge("synthesis_agent", END);
+    wf.addEdge("synthesis_agent", END);
 
     // ── Step 3: Compile ───────────────────────────────────────────────
-    const compiled = workflow.compile({
+    const compiled = wf.compile({
       checkpointer,
       // Pause BEFORE approval_node; /api/agent/approve resumes the thread.
       interruptBefore: ["approval_node"],

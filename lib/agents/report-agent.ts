@@ -54,9 +54,9 @@ export async function reportAgent(
   _config: unknown
 ): Promise<AtheneStateUpdate> {
   const {
-    orgId,
-    userId,
-    role,
+    org_id: orgId,
+    user_id: userId,
+    user_role: role,
     messages,
   } = state;
 
@@ -111,18 +111,20 @@ export async function reportAgent(
       });
 
       // Build a structured source list with chunk_id + document_id for citations.
-      const sourceDocs = results.map((r: any, i: number) => ({
+      const sourceDocs = (results as Record<string, unknown>[]).map((r, i: number) => ({
         index: i + 1,
-        chunk_id: r.chunk_id ?? r.id ?? `chunk_${i}`,
-        document_id: r.document_id ?? "unknown",
-        content:
-          r.content_preview ??
-          r.metadata?.text_preview ??
-          r.metadata?.content ??
-          r.metadata?.text ??
-          (typeof r.metadata === "object"
-            ? JSON.stringify(r.metadata)
-            : String(r.metadata ?? "")),
+        chunk_id: String(r.chunk_id ?? r.id ?? `chunk_${i}`),
+        document_id: String(r.document_id ?? "unknown"),
+        content: (() => {
+          const meta = r.metadata as Record<string, unknown> | null | undefined
+          return (
+            (r.content_preview as string | undefined) ??
+            (meta?.text_preview as string | undefined) ??
+            (meta?.content as string | undefined) ??
+            (meta?.text as string | undefined) ??
+            (meta ? JSON.stringify(meta) : "")
+          )
+        })(),
       }));
 
       const sourceBlock = sourceDocs

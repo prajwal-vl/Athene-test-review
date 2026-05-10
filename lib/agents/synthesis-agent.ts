@@ -60,22 +60,42 @@ function extractCitations(answer: string, chunks: RetrievedChunk[]): CitedSource
 
 export async function synthesisAgentNode(state: AtheneStateType): Promise<AtheneStateUpdate> {
   const chunks = state.retrieved_chunks ?? []
-  if (chunks.length === 0) {
-    return { final_answer: REFUSAL, cited_sources: [], retrieved_chunks: [] }
+  const graphContext = state.graph_context ?? null
+  const graphBoundaryReached = state.graph_boundary_reached ?? false
+
+  if (chunks.length === 0 && !graphContext) {
+    return {
+      final_answer: REFUSAL,
+      cited_sources: [],
+      retrieved_chunks: [],
+      graph_context: null,
+      graph_boundary_reached: false,
+    }
   }
 
   const mode = state.is_cross_dept_query || state.task_type === 'cross_dept_retrieval' ? 'BI' : 'STANDARD'
+
+  const chunkSection = chunks.length > 0 ? toContext(chunks) : '(no document chunks retrieved)'
+  const graphSection = graphContext
+    ? `\n\n---\nKnowledge Graph Context:\n${graphContext}`
+    : ''
+  const boundaryNote = graphBoundaryReached
+    ? '\n\n*Note: some related information may exist in areas you do not have access to.*'
+    : ''
+
   const prompt = loadPromptTemplate()
     .replace('{{MODE}}', mode)
-    .replace('{{CONTEXT}}', toContext(chunks))
+    .replace('{{CONTEXT}}', chunkSection + graphSection)
 
   const { client } = await resolveModelClient(state.org_id, state.complexity ?? 'simple', 'medium')
   const response = await client.invoke([new SystemMessage(prompt), ...state.messages])
-  const finalAnswer = parseText(response.content).trim() || REFUSAL
+  const finalAnswer = (parseText(response.content).trim() || REFUSAL) + boundaryNote
 
   return {
     final_answer: finalAnswer,
     cited_sources: extractCitations(finalAnswer, chunks),
     retrieved_chunks: [],
+    graph_context: null,
+    graph_boundary_reached: false,
   }
 }

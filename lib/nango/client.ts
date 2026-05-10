@@ -1,5 +1,5 @@
 import { Nango } from '@nangohq/node'
-import { supabase } from '../supabase/server'
+import { supabaseAdmin as supabase } from '../supabase/server'
 
 let nangoInstance: Nango | null = null;
 

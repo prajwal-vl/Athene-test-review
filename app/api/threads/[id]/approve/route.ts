@@ -37,9 +37,9 @@ export async function POST(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // 2. Resolve internal user ID and org
+  // 2. Resolve user access and verify org membership
   const access = await resolveUserAccess(clerkUserId, clerkOrgId);
-  if (!access.internal_user_id) {
+  if (!access.role) {
     return NextResponse.json(
       { error: "User not found in organization" },
       { status: 403 },
@@ -125,7 +125,7 @@ export async function POST(
   await logHitlDecision({
     orgId: clerkOrgId,
     threadId,
-    userId: access.internal_user_id,
+    userId: clerkUserId,
     actionType: pendingAction.tool,
     decision: body.action,
     originalPayload: pendingAction.payload,
@@ -168,7 +168,7 @@ export async function POST(
       console.error("[hitl] Graph resume failed after approval", {
         threadId,
         orgId: clerkOrgId,
-        userId: access.internal_user_id,
+        userId: clerkUserId,
         decision: body.action,
         error: err instanceof Error ? err.message : String(err),
       });

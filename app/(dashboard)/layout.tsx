@@ -26,12 +26,12 @@ export default async function DashboardLayout({
   return (
     <div className="flex h-screen overflow-hidden bg-[var(--background)]">
       {/* Sidebar */}
-      <Sidebar role={userAccess.role} className="hidden lg:flex" />
+      <Sidebar role={userAccess.role ?? 'member'} className="hidden lg:flex" />
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
-        <Header role={userAccess.role} />
+        <Header role={userAccess.role ?? 'member'} />
 
         {/* Page Content */}
         <main className="flex-1 overflow-y-auto bg-gradient-to-b from-[var(--background)] via-[var(--background)] to-purple-950/5 dark:to-purple-950/20">
