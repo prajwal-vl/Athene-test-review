@@ -306,14 +306,28 @@ export default function IntegrationsPage() {
       const nango = new Nango({ connectSessionToken: token });
 
       await nango.openConnectUI({
-        onEvent: (event) => {
+        onEvent: async (event) => {
           if (event.type === "close") {
             setConnecting(null);
           }
           if (event.type === "connect") {
-            setToast({ msg: `${provider.displayName} connected successfully.`, type: "success" });
-            fetchConnections(); // Refresh connections list
+            setToast({ msg: `${provider.displayName} connected — starting sync…`, type: "success" });
+            fetchConnections();
             setConnecting(null);
+
+            // Trigger initial indexing job via QStash
+            try {
+              await fetch("/api/connections/sync", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  connectionId: (event as any).payload?.connectionId ?? provider.nangoKey,
+                  provider: provider.nangoKey,
+                }),
+              });
+            } catch {
+              // Non-fatal — job will run on next scheduled sync
+            }
           }
         },
       });

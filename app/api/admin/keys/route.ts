@@ -26,6 +26,48 @@ export async function GET() {
   return NextResponse.json({ keys: data ?? [] })
 }
 
+export async function POST(req: NextRequest) {
+  const { userId, orgId, orgRole } = await auth()
+  if (!userId || !orgId) return new NextResponse('Unauthorized', { status: 401 })
+
+  const role = mapRole(orgRole ?? undefined)
+  if (role !== 'admin') return new NextResponse('Forbidden', { status: 403 })
+
+  const kmsSecret = process.env.KMS_SECRET
+  if (!kmsSecret) {
+    return NextResponse.json({ error: 'KMS_SECRET is not configured on this server' }, { status: 500 })
+  }
+
+  let body: { provider?: string; plaintext_key?: string }
+  try {
+    body = await req.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
+
+  const { provider, plaintext_key } = body
+  if (!provider || !plaintext_key) {
+    return NextResponse.json({ error: 'provider and plaintext_key are required' }, { status: 400 })
+  }
+
+  // Store via DB function that encrypts with pgp_sym_encrypt before writing.
+  // The plaintext_key is sent as a bind parameter — never interpolated into SQL.
+  const { error } = await supabaseAdmin.rpc('store_llm_key', {
+    p_org_id:    orgId,
+    p_provider:  provider,
+    p_plaintext: plaintext_key,
+    p_kms_key:   kmsSecret,
+  })
+
+  if (error) {
+    console.error('[keys] Failed to store key:', error.message)
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  invalidateByokCache(orgId)
+  return NextResponse.json({ stored: true })
+}
+
 export async function DELETE(req: NextRequest) {
   const { userId, orgId, orgRole } = await auth()
   if (!userId || !orgId) return new NextResponse('Unauthorized', { status: 401 })
