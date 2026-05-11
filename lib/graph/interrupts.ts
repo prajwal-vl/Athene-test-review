@@ -46,17 +46,36 @@ export async function verifyThreadOwner(
   userId: string,
   orgId: string,
 ): Promise<{ id: string; user_id: string; org_id: string } | null> {
+  // 1. Resolve Clerk Org ID -> UUID
+  const { data: orgData } = await supabaseAdmin
+    .from("organizations")
+    .select("id")
+    .eq("clerk_org_id", orgId)
+    .maybeSingle();
+
+  if (!orgData) return null;
+
+  // 2. Resolve Clerk User ID -> Org Member UUID
+  const { data: userData } = await supabaseAdmin
+    .from("org_members")
+    .select("id")
+    .eq("clerk_user_id", userId)
+    .eq("org_id", orgData.id)
+    .maybeSingle();
+
+  if (!userData) return null;
+
   const { data, error } = await supabaseAdmin
     .from("threads")
     .select("id, user_id, org_id")
     .eq("id", threadId)
-    .eq("org_id", orgId)
+    .eq("org_id", orgData.id)
     .single();
 
   if (error || !data) return null;
 
   // Only the thread owner can approve their own actions
-  if (data.user_id !== userId) return null;
+  if (data.user_id !== userData.id) return null;
 
   return data as { id: string; user_id: string; org_id: string };
 }
@@ -113,10 +132,36 @@ export async function logHitlDecision(params: {
   originalPayload: Record<string, unknown>;
   editedPayload: Record<string, unknown> | null;
 }): Promise<void> {
+  // 1. Resolve Org UUID
+  const { data: orgData } = await supabaseAdmin
+    .from("organizations")
+    .select("id")
+    .eq("clerk_org_id", params.orgId)
+    .maybeSingle();
+
+  if (!orgData) {
+    console.error("[hitl] Audit log failed: Could not resolve org", params.orgId);
+    return;
+  }
+
+  // 2. Resolve User (Org Member) UUID
+  const { data: userData } = await supabaseAdmin
+    .from("org_members")
+    .select("id")
+    .eq("clerk_user_id", params.userId)
+    .eq("org_id", orgData.id)
+    .maybeSingle();
+
+  if (!userData) {
+    console.error("[hitl] Audit log failed: Could not resolve user", params.userId);
+    return;
+  }
+
+  // 3. Log to database
   const { error } = await supabaseAdmin.from("hitl_decisions").insert({
-    org_id: params.orgId,
+    org_id: orgData.id,
     thread_id: params.threadId,
-    user_id: params.userId,
+    user_id: userData.id,
     action_type: params.actionType,
     decision: params.decision === "approve" ? "approved"
       : params.decision === "edit" ? "edited"
