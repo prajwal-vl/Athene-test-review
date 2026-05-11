@@ -12,6 +12,8 @@ import type { EmailDraft } from "@/lib/integrations/microsoft/outlook-fetcher";
 import { createEvent } from "@/lib/integrations/microsoft/calendar-fetcher";
 import type { EventDraft } from "@/lib/integrations/microsoft/calendar-fetcher";
 import { supabaseAdmin } from "@/lib/supabase/server";
+import { qstash } from "@/lib/qstash/client";
+import { getAppBaseUrl } from "@/lib/config/app-url";
 
 type PendingWriteAction = {
   tool: string;
@@ -148,6 +150,19 @@ export async function actionExecutorNode(
           state.org_id,
           toEventDraft(action.payload)
         );
+        break;
+      }
+      case "data-index": {
+        const { org_id, document_ids, doc_count } = action.payload as {
+          org_id: string;
+          document_ids: string[];
+          doc_count: number;
+        };
+        await qstash.publishJSON({
+          url: `${getAppBaseUrl()}/api/worker/index-delta`,
+          body: { org_id, document_ids },
+        });
+        result = { queued: doc_count };
         break;
       }
       default:

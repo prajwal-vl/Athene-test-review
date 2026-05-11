@@ -43,14 +43,7 @@ import { actionExecutorNode }      from "./nodes/action-executor";
 import { emailAgentNode }          from "../agents/email-agent";
 import { calendarAgent }           from "../agents/calendar-agent";
 import { reportAgent }             from "../agents/report-agent";
-
-// ── Stub factory (data_index_agent pending implementation) ───────────────────
-function stubNode(label: string) {
-  return async (state: typeof AtheneState.State): Promise<Partial<typeof AtheneState.State>> => {
-    console.warn(`[graph] stub node reached: ${label}`, { org_id: state.org_id });
-    return { next: "FINISH" };
-  };
-}
+import { dataIndexAgent }          from "../agents/data-index-agent";
 
 // ── Compiled graph singleton ────────────────────────────────────────────────
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -82,7 +75,7 @@ export async function getAgentGraph(): Promise<AtheneGraph> {
     workflow.addNode("email_agent",         emailAgentNode);
     workflow.addNode("calendar_agent",      calendarAgent);
     workflow.addNode("report_agent",        reportAgent);
-    workflow.addNode("data_index_agent",    stubNode("data_index_agent"));
+    workflow.addNode("data_index_agent",    dataIndexAgent);
     // approval_node: graph is interrupted BEFORE this node executes (HITL gate)
     workflow.addNode("approval_node",       approvalNode);
     workflow.addNode("action_executor",     actionExecutorNode);
