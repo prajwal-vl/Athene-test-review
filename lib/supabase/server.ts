@@ -24,3 +24,6 @@ export const supabaseAdmin = new Proxy({} as SupabaseClient, {
     return (getClient() as unknown as Record<string | symbol, unknown>)[prop]
   },
 })
+
+/** @deprecated Use supabaseAdmin instead. */
+export const supabase = supabaseAdmin

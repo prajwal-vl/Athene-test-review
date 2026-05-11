@@ -29,6 +29,8 @@ type EdgeRow = {
   relation: string;
   provenance: string;
   confidence: number;
+  department_id?: string | null;
+  visibility?: string;
 };
 
 const nodes: NodeRow[] = [];

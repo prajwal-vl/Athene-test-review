@@ -142,6 +142,7 @@ interface Connection {
   id: string;
   connection_id: string;
   provider_config_key: string;
+  org_id?: string;
   created_at?: string;
   metadata?: Record<string, unknown>;
 }

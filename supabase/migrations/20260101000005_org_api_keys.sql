@@ -9,7 +9,7 @@
 -- Only last 4 chars are shown in the admin UI.
 -- ============================================================
 
-CREATE TABLE llm_keys (
+CREATE TABLE IF NOT EXISTS llm_keys (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   org_id          uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
   provider        text NOT NULL,             -- 'anthropic', 'openai', 'google'

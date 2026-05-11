@@ -31,11 +31,15 @@ function makeState(overrides: Partial<AtheneState> = {}): AtheneState {
     hop_count: 0,
     reasoning: "",
     retrieved_chunks: [],
+    graph_context: null,
+    graph_boundary_reached: false,
+    pending_tool_calls: [],
     run_status: "idle",
     awaiting_approval: false,
     pending_write_action: null,
     final_answer: null,
     cited_sources: [],
+    next: "FINISH",
     ...overrides,
   };
 }
