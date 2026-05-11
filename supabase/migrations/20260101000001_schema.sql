@@ -13,39 +13,51 @@ CREATE EXTENSION IF NOT EXISTS "pg_trgm";        -- trigram text search fallback
 -- Custom ENUM types
 -- ============================================================
 
-CREATE TYPE IF NOT EXISTS user_role AS ENUM ('member', 'super_user', 'admin');
+DO $$ BEGIN
+  CREATE TYPE user_role AS ENUM ('member', 'super_user', 'admin');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-CREATE TYPE IF NOT EXISTS visibility_level AS ENUM (
-  'org_wide',        -- visible to everyone in the org
-  'department',      -- visible only to members of that department
-  'bi_accessible',   -- visible to department + any super_user with a grant
-  'confidential',    -- visible only to department members + admins (grants CANNOT unlock)
-  'restricted'       -- visible only to the owner (personal Gmail, Calendar, etc.)
-);
+DO $$ BEGIN
+  CREATE TYPE visibility_level AS ENUM (
+    'org_wide',
+    'department',
+    'bi_accessible',
+    'confidential',
+    'restricted'
+  );
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-CREATE TYPE IF NOT EXISTS grant_scope AS ENUM (
-  'department',      -- grant access to an entire department's docs
-  'resource',        -- grant access to a specific document or folder
-  'source'           -- grant access to all docs from a source type (e.g., all Jira)
-);
+DO $$ BEGIN
+  CREATE TYPE grant_scope AS ENUM (
+    'department',
+    'resource',
+    'source'
+  );
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-CREATE TYPE IF NOT EXISTS connection_scope AS ENUM (
-  'org',             -- admin-connected, shared across the org
-  'user'             -- user-connected, personal (Gmail, personal Calendar)
-);
+DO $$ BEGIN
+  CREATE TYPE connection_scope AS ENUM (
+    'org',
+    'user'
+  );
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-CREATE TYPE IF NOT EXISTS connection_status AS ENUM (
-  'active',
-  'syncing',
-  'error',
-  'disconnected'
-);
+DO $$ BEGIN
+  CREATE TYPE connection_status AS ENUM (
+    'active',
+    'syncing',
+    'error',
+    'disconnected'
+  );
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-CREATE TYPE IF NOT EXISTS hitl_decision AS ENUM (
-  'approved',
-  'edited',
-  'rejected'
-);
+DO $$ BEGIN
+  CREATE TYPE hitl_decision AS ENUM (
+    'approved',
+    'edited',
+    'rejected'
+  );
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- ============================================================
 -- 1. Organizations

@@ -6,11 +6,9 @@
 -- Automations — user-configured scheduled tasks
 -- ============================================================
 
-CREATE TYPE automation_status AS ENUM (
-  'active',
-  'paused',
-  'error'
-);
+DO $$ BEGIN
+  CREATE TYPE automation_status AS ENUM ('active', 'paused', 'error');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 CREATE TABLE automations (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
