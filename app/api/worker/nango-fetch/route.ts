@@ -49,6 +49,8 @@ import { microsoftFetcher } from '@/lib/integrations/microsoft/index'
 import { fetchJiraIssues } from '@/lib/integrations/atlassian/jira-fetcher'
 import { fetchConfluencePages } from '@/lib/integrations/atlassian/confluence-fetcher'
 import { getAppBaseUrl } from '@/lib/config/app-url'
+import { retryWithBackoff } from '@/lib/integrations/retry'
+import { supabaseAdmin } from '@/lib/supabase/server'
 
 // ---- Provider Fetcher Map ---------------------------------------
 
@@ -229,6 +231,19 @@ export async function POST(request: Request): Promise<Response> {
     )
   }
 
+  // 2a. Verify connection belongs to this org (defense-in-depth)
+  const { data: conn } = await supabaseAdmin
+    .from('nango_connections')
+    .select('id, org_id')
+    .eq('connection_id', connectionId)
+    .eq('org_id', orgId)
+    .maybeSingle()
+
+  if (!conn) {
+    logger.warn({ connectionId, orgId }, '[nango-fetch] Connection not found for org, skipping')
+    return NextResponse.json({ error: 'Connection not found' }, { status: 404 })
+  }
+
   // 3. Look up the fetcher
   const fetchers = providerFetcherMap[provider]
   if (!fetchers) {
@@ -239,11 +254,32 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   try {
-    // 4. Run all fetchers for this provider
+    // 4. Run all fetchers for this provider, each wrapped with retry+backoff.
+    // If a fetcher still fails after retries, log and continue — partial sync
+    // is better than no sync.
     const allChunks: FetchedChunk[] = []
     for (const fetcher of fetchers) {
-      const chunks = await fetcher(connectionId, orgId, { since })
-      allChunks.push(...chunks)
+      try {
+        const chunks = await retryWithBackoff(
+          () => fetcher(connectionId, orgId, { since }),
+          {
+            retries: 3,
+            baseDelayMs: 1000,
+            onRetry: (err, attempt) => {
+              logger.warn(
+                { provider, orgId, attempt, err: err instanceof Error ? err.message : String(err) },
+                '[nango-fetch] Fetcher failed, retrying'
+              )
+            },
+          }
+        )
+        allChunks.push(...chunks)
+      } catch (fetcherErr) {
+        logger.error(
+          { provider, orgId, err: fetcherErr instanceof Error ? fetcherErr.message : String(fetcherErr) },
+          '[nango-fetch] Fetcher failed after all retries, continuing with partial results'
+        )
+      }
     }
 
     // 5. Index all fetched chunks (connectionId resolves/creates the documents row)

@@ -1,24 +1,44 @@
 import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { withRLS } from '@/lib/supabase/rls-client'
+import { resolveUserAccess } from '@/lib/auth/rbac'
 import { supabaseAdmin } from '@/lib/supabase/server'
 
 export async function GET() {
   const { userId, orgId } = await auth()
   if (!userId || !orgId) return new NextResponse('Unauthorized', { status: 401 })
 
-  const { data, error } = await supabaseAdmin
-    .from('insights')
-    .select('id, title, query, result, citations, refreshed_at, created_at')
-    .eq('org_id', orgId)
-    .order('sort_order', { ascending: true })
-    .order('created_at', { ascending: false })
-
-  if (error) {
-    console.error('[insights] Failed to fetch:', error.message)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  const access = await resolveUserAccess(userId, orgId)
+  if (!access.role) {
+    return new NextResponse('User not found in organization', { status: 403 })
   }
 
-  return NextResponse.json({ insights: data ?? [] })
+  try {
+    const data = await withRLS(
+      {
+        org_id: orgId,
+        user_id: userId,
+        user_role: access.role,
+        department_id: access.dept_id ?? null,
+      },
+      async (client) => {
+        const { data: rows, error } = await client
+          .from('insights')
+          .select('id, title, query, result, citations, refreshed_at, created_at')
+          .eq('org_id', orgId)
+          .order('sort_order', { ascending: true })
+          .order('created_at', { ascending: false })
+        if (error) throw error
+        return rows ?? []
+      },
+    )
+
+    return NextResponse.json({ insights: data })
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.error('[insights] Failed to fetch:', message)
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
 }
 
 export async function POST(req: NextRequest) {

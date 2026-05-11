@@ -18,6 +18,36 @@ import { baseFetch } from './base'
 import type { FetchedChunk } from './base'
 import { logger } from '@/lib/logger'
 
+// ---- Retry helper -----------------------------------------------
+
+/**
+ * Retries an async function with exponential backoff.
+ * On exhaustion, throws the last error so callers (e.g. QStash) can retry the job.
+ *
+ * @param fn          - The async operation to attempt.
+ * @param retries     - Number of retry attempts after the initial try (default 3).
+ * @param baseDelayMs - Delay before first retry in ms; doubles each attempt (default 1000).
+ */
+async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  retries: number = 3,
+  baseDelayMs: number = 1000,
+): Promise<T> {
+  let lastError: unknown
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await fn()
+    } catch (err) {
+      lastError = err
+      if (attempt < retries) {
+        const delayMs = baseDelayMs * 2 ** attempt
+        await new Promise((resolve) => setTimeout(resolve, delayMs))
+      }
+    }
+  }
+  throw lastError
+}
+
 // ---- Constants --------------------------------------------------
 
 /** Target chunk size in characters (~500 tokens ≈ 2000 chars) */
@@ -291,18 +321,14 @@ export async function indexDocuments(
   const allEmbeddings: number[][] = []
   for (let i = 0; i < allTexts.length; i += EMBED_BATCH_SIZE) {
     const batchTexts = allTexts.slice(i, i + EMBED_BATCH_SIZE)
-    try {
-      const batchEmbeddings = await generateEmbeddings(batchTexts)
-      allEmbeddings.push(...batchEmbeddings)
-    } catch (err) {
-      console.error(
-        `[indexing] Embedding batch ${i}–${i + batchTexts.length} failed:`,
-        err instanceof Error ? err.message : String(err)
-      )
-      // Fill with null placeholders so index alignment is preserved
-      allEmbeddings.push(...batchTexts.map(() => []))
-      errors += batchTexts.length
-    }
+    // Retry with exponential backoff (1s, 2s, 4s). On exhaustion, throw so
+    // QStash retries the entire job rather than silently losing data.
+    const batchEmbeddings = await retryWithBackoff(
+      () => generateEmbeddings(batchTexts),
+      3,
+      1000,
+    )
+    allEmbeddings.push(...batchEmbeddings)
   }
 
   // ---- Phase 4: upsert all records in one call -------------------

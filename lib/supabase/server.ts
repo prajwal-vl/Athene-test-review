@@ -1,4 +1,17 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { checkEnv } from '@/lib/config/env-check'
+
+// Validate required environment variables once at module load time.
+// This runs on the first import of this module (server-side only).
+if (typeof window === 'undefined') {
+  try {
+    checkEnv()
+  } catch (err) {
+    console.error(err instanceof Error ? err.message : String(err))
+    // Re-throw in production so a misconfigured deployment fails fast.
+    if (process.env.NODE_ENV === 'production') throw err
+  }
+}
 
 let _client: SupabaseClient | null = null
 
