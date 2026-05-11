@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { AlertCircle, CheckCircle2, Zap, Trash2, Plus, Loader2, Clock } from "lucide-react";
+import { AlertCircle, CheckCircle2, Zap, Trash2, Plus, Loader2, Clock, Power } from "lucide-react";
 
 interface Automation {
   id: string;
@@ -46,6 +46,7 @@ export default function AutomationsPage() {
   const [addError, setAddError] = useState<string | null>(null);
   const [addSuccess, setAddSuccess] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [toggling, setToggling] = useState<string | null>(null);
 
   const fetchAutomations = async () => {
     setLoading(true);
@@ -85,6 +86,27 @@ export default function AutomationsPage() {
       setAddError(e.message);
     } finally {
       setAdding(false);
+    }
+  };
+
+  const handleToggle = async (id: string, currentStatus: string) => {
+    setToggling(id);
+    try {
+      const enabled = currentStatus !== "active";
+      const res = await fetch("/api/admin/automations", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, enabled }),
+      });
+      if (!res.ok) {
+        const d = await res.json();
+        throw new Error(d.error ?? "Toggle failed");
+      }
+      await fetchAutomations();
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setToggling(null);
     }
   };
 
@@ -221,17 +243,31 @@ export default function AutomationsPage() {
                   </td>
                   <td className="px-4 py-3 text-[var(--sidebar-text-secondary)]">{a.run_count}</td>
                   <td className="px-4 py-3 text-right">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      disabled={deleting === a.id}
-                      onClick={() => handleDelete(a.id)}
-                      className="text-red-400 hover:text-red-500 hover:bg-red-500/10"
-                    >
-                      {deleting === a.id
-                        ? <Loader2 className="h-4 w-4 animate-spin" />
-                        : <Trash2 className="h-4 w-4" />}
-                    </Button>
+                    <div className="flex items-center justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={toggling === a.id}
+                        onClick={() => handleToggle(a.id, a.status)}
+                        className={a.status === "active" ? "text-green-500 hover:text-green-600 hover:bg-green-500/10" : "text-[var(--sidebar-text-secondary)] hover:text-[var(--foreground)]"}
+                        title={a.status === "active" ? "Pause automation" : "Activate automation"}
+                      >
+                        {toggling === a.id
+                          ? <Loader2 className="h-4 w-4 animate-spin" />
+                          : <Power className="h-4 w-4" />}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={deleting === a.id}
+                        onClick={() => handleDelete(a.id)}
+                        className="text-red-400 hover:text-red-500 hover:bg-red-500/10"
+                      >
+                        {deleting === a.id
+                          ? <Loader2 className="h-4 w-4 animate-spin" />
+                          : <Trash2 className="h-4 w-4" />}
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))}

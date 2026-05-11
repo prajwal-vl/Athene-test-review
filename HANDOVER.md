@@ -288,21 +288,19 @@ Visit `https://<your-vercel-url>` and:
 
 ## 8. What Still Needs Work
 
-These are the remaining items that were not implemented, in priority order:
-
 ### Not yet built
 | Item | Why it matters | Estimated effort |
 |------|---------------|-----------------|
-| `data_index_agent` write execution | Agent resolves docs and queues reindex after HITL, but the action executor doesn't have a `data-index` case yet | 1 hour |
-| Morning briefing cron schedule | The worker exists but no QStash cron is configured to trigger it at 7am | 2 hours |
-| Nango `nango.yaml` | Provider integration configs must be set up manually in the Nango dashboard; a `nango.yaml` would automate this | Half day |
-| Google OAuth write actions | `email_agent` and `calendar_agent` only support Microsoft (Outlook/Calendar); no Gmail/Google Calendar send | 2-3 days |
 | Mobile sidebar | Sidebar is hidden on small screens; mobile nav is partially wired in the header | Half day |
 
 ### Known limitations
-- **Email/calendar write actions require Microsoft** — the action executor only calls Microsoft Graph API. Users with Gmail/Google Calendar connections can read and search their data but cannot send emails or create events through Athene yet.
-- **Briefing requires QStash cron** — morning briefings only appear if someone configures a QStash scheduled message to POST to `/api/worker/morning-briefing` with `{ orgId }` daily.
 - **No real-time sync** — data sources are re-indexed on manual trigger or on initial connect. Changes to source documents are not picked up until the next sync.
+
+### Completed in latest session
+The following items previously listed here are now implemented:
+- **Google OAuth write actions** — `email_agent` and `calendar_agent` now detect the org's connected provider (Microsoft vs Google) at runtime and set `tool` to `gmail-send` / `google-calendar-create` accordingly. The `action-executor` dispatches to the correct Google API.
+- **Automations cron wiring** — The `PATCH /api/admin/automations` endpoint now registers / cancels real QStash scheduled messages when an automation is toggled on/off. The admin UI has a toggle (power) button per automation row.
+- **Nango `nango.yaml`** — `nango/nango.yaml` now defines all 16 supported integrations (Google Drive, Gmail, Google Calendar, Microsoft/Outlook/Calendar, Slack, Notion, HubSpot, Salesforce, GitHub, Linear, Zendesk, Jira, Confluence, Snowflake) using the exact provider keys from the `providerFetcherMap`.
 
 ---
 

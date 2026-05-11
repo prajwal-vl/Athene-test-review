@@ -13,6 +13,7 @@
 import { HumanMessage, AIMessage } from "@langchain/core/messages";
 import { getModel } from "../langgraph/llm-factory";
 import type { AtheneState, AtheneStateUpdate } from "../langgraph/state";
+import { supabaseAdmin } from "@/lib/supabase/server";
 
 // ---- Prompt (inlined at build time, no fs.readFileSync) ------
 
@@ -100,6 +101,44 @@ function parseEmailDraft(raw: string): {
   }
 }
 
+// ---- Provider detection ----------------------------------------
+
+async function resolveEmailTool(clerkOrgId: string): Promise<"email-send" | "gmail-send"> {
+  // Look up the org's internal id
+  const { data: orgRow } = await supabaseAdmin
+    .from("organizations")
+    .select("id")
+    .eq("clerk_org_id", clerkOrgId)
+    .maybeSingle();
+
+  if (!orgRow) return "email-send"; // default to Microsoft if org not found
+
+  // Check if the org has a Microsoft connection
+  const { data: msConn } = await supabaseAdmin
+    .from("nango_connections")
+    .select("id")
+    .eq("org_id", orgRow.id)
+    .eq("provider_config_key", "microsoft")
+    .limit(1)
+    .maybeSingle();
+
+  if (msConn) return "email-send";
+
+  // Check if the org has a Gmail or combined Google connection
+  const { data: gmailConn } = await supabaseAdmin
+    .from("nango_connections")
+    .select("id")
+    .eq("org_id", orgRow.id)
+    .in("provider_config_key", ["gmail", "google"])
+    .limit(1)
+    .maybeSingle();
+
+  if (gmailConn) return "gmail-send";
+
+  // Default to Microsoft (will fail at execution if no connection configured)
+  return "email-send";
+}
+
 // ---- Node function -------------------------------------------
 
 export async function emailAgentNode(
@@ -121,6 +160,9 @@ export async function emailAgentNode(
 
   const draft = parseEmailDraft(rawResponse);
 
+  // Determine which email provider the org has connected
+  const emailTool = await resolveEmailTool(state.org_id);
+
   // ATH-37: Set pending_write_action and pause for HITL approval.
   // The graph's interrupt_before: ["approval_node"] will halt
   // execution before the approval_node runs, giving the human
@@ -129,7 +171,7 @@ export async function emailAgentNode(
     run_status: "awaiting_approval",
     awaiting_approval: true,
     pending_write_action: {
-      tool: "email-send",
+      tool: emailTool,
       payload: draft,
       requested_at: new Date().toISOString(),
     },
