@@ -52,6 +52,8 @@ import { getAppBaseUrl } from '@/lib/config/app-url'
 import { retryWithBackoff } from '@/lib/integrations/retry'
 import { supabaseAdmin } from '@/lib/supabase/server'
 
+export const maxDuration = 300; // Vercel max for Pro plan
+
 // ---- Provider Fetcher Map ---------------------------------------
 
 type FetcherFn = (

@@ -4,6 +4,8 @@ import { HumanMessage } from "@langchain/core/messages";
 import { getAgentGraph } from "@/lib/langgraph/graph";
 import { mapRole } from "@/lib/auth/clerk";
 
+export const maxDuration = 300; // Vercel max for Pro plan
+
 export async function POST(req: NextRequest) {
   try {
     const { userId, orgId, orgRole } = await auth();

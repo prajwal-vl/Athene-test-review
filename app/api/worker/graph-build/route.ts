@@ -26,6 +26,8 @@ import { NextResponse } from 'next/server'
 import { verifyQStashSignature } from '@/lib/qstash/verify'
 import { buildGraphForDocuments, type BuildMode } from '@/lib/knowledge-graph/builder'
 
+export const maxDuration = 300; // Vercel max for Pro plan
+
 // ---- Payload type -------------------------------------------
 
 interface GraphBuildPayload {

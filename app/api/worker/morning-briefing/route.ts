@@ -4,6 +4,8 @@ import { supabaseAdmin } from '@/lib/supabase/server'
 import { resolveModelClient } from '@/lib/langgraph/llm-factory'
 import { HumanMessage, SystemMessage } from '@langchain/core/messages'
 
+export const maxDuration = 300; // Vercel max for Pro plan
+
 interface BriefingJobBody {
   orgId: string
   userId: string

@@ -22,6 +22,8 @@ import { qstash } from '@/lib/qstash/client'
 import { supabaseAdmin } from '@/lib/supabase/server'
 import { getAppBaseUrl } from '@/lib/config/app-url'
 
+export const maxDuration = 300; // Vercel max for Pro plan
+
 // ---- Payload type -------------------------------------------
 
 interface IndexDeltaPayload {
