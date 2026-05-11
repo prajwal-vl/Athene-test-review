@@ -111,8 +111,6 @@ async function generateEmbeddings(texts: string[]): Promise<number[][]> {
     .map((d) => d.embedding)
 }
 
-// ---- Main Indexing Function -------------------------------------
-
 // ---- Document record resolution ---------------------------------
 
 type VisibilityLevel = 'org_wide' | 'department' | 'bi_accessible' | 'confidential' | 'restricted'
@@ -325,25 +323,3 @@ export async function indexDocuments(
   return { indexed: prepared.length, errors }
 }
 
-// ---- Helpers ----------------------------------------------------
-
-/**
- * Generates a deterministic ID for a chunk.
- * Ensures re-indexing overwrites rather than duplicates.
- */
-function generateChunkId(
-  sourceType: string,
-  sourceUrl: string,
-  chunkIndex: number
-): string {
-  // Simple hash: we use a deterministic string
-  // In production, you'd use a proper hash function
-  const raw = `${sourceType}:${sourceUrl}:${chunkIndex}`
-  // Convert to a URL-safe base64-like string
-  let hash = 0
-  for (let i = 0; i < raw.length; i++) {
-    const char = raw.charCodeAt(i)
-    hash = ((hash << 5) - hash + char) | 0
-  }
-  return `${sourceType}_${Math.abs(hash).toString(36)}_${chunkIndex}`
-}

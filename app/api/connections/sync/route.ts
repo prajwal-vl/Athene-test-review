@@ -1,7 +1,11 @@
 // app/api/connections/sync/route.ts
 //
-// Triggers a nango-fetch indexing job for a freshly-connected provider.
+// Triggers nango-fetch indexing jobs for a freshly-connected provider.
 // Called by the integrations page immediately after Nango's "connect" event fires.
+//
+// #18 Fan-out: multi-resource providers (Google, Microsoft) dispatch one
+// QStash job per worker key so each resource is indexed, retried, and
+// throttled independently.
 //
 // QStash dispatches to /api/worker/nango-fetch which:
 //   fetches chunks → embeds → upserts → enqueues graph-build
@@ -10,6 +14,7 @@ import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { dispatchThrottled } from '@/lib/qstash/client'
 import { getAppBaseUrl } from '@/lib/config/app-url'
+import { PROVIDER_WORKER_KEYS } from '@/lib/integrations/providers'
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const { userId, orgId } = await auth()
@@ -32,17 +37,29 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   const url = `${getAppBaseUrl()}/api/worker/nango-fetch`
 
-  const { dispatched, msgId } = await dispatchThrottled({
-    orgId,
-    sourceType: provider,
-    url,
-    body: { orgId, connectionId, provider },
-  })
+  // Fan out: look up the worker-level keys for this provider.
+  // e.g. 'google' → ['google-drive', 'gmail', 'google-calendar']
+  //      'slack'  → ['slack']
+  const workerKeys: string[] =
+    (PROVIDER_WORKER_KEYS as Record<string, string[]>)[provider] ?? [provider]
 
-  if (!dispatched) {
-    // Throttled — job queued in pending_background_jobs, will run when slot frees
-    return NextResponse.json({ queued: true, dispatched: false })
+  const results = await Promise.all(
+    workerKeys.map((workerKey) =>
+      dispatchThrottled({
+        orgId,
+        sourceType: workerKey,
+        url,
+        body: { orgId, connectionId, provider: workerKey },
+      }),
+    ),
+  )
+
+  const allQueued = results.every((r) => !r.dispatched)
+  if (allQueued) {
+    // All jobs throttled — queued in pending_background_jobs
+    return NextResponse.json({ queued: true, dispatched: false, workerKeys })
   }
 
-  return NextResponse.json({ dispatched: true, msgId })
+  const msgIds = results.flatMap((r) => (r.msgId ? [r.msgId] : []))
+  return NextResponse.json({ dispatched: true, msgIds, workerKeys })
 }
