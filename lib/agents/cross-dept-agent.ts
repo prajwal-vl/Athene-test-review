@@ -18,7 +18,7 @@ import { ToolNode } from '@langchain/langgraph/prebuilt'
 import { AIMessage, ToolMessage } from '@langchain/core/messages'
 import type { RunnableConfig } from '@langchain/core/runnables'
 import { supabaseAdmin } from '@/lib/supabase/server'
-import { crossDeptVectorSearchTool } from '@/lib/tools/registry'
+import { crossDeptVectorSearchTool } from '@/lib/langgraph/tools/vector-search'
 import type { AtheneStateType, AtheneStateUpdate } from '@/lib/langgraph/state'
 
 // Module-level ToolNode singleton — never recreated per request
@@ -31,12 +31,12 @@ export async function crossDeptAgent(
   config: RunnableConfig,
 ): Promise<AtheneStateUpdate> {
   const { org_id, user_id, user_role } = state
-
+  
   // ⚠️ HARD ROLE CHECK — must be the first statement
-  if (user_role !== 'super_user' && user_role !== 'admin') {
+  if (user_role !== 'bi_analyst' && user_role !== 'super_user' && user_role !== 'admin') {
     return {
       messages: [
-        new AIMessage('Access Denied: Cross-department analysis is restricted to BI Analysts.'),
+        new AIMessage('Access Denied: Cross-department analysis is restricted to BI Analysts and Admins.'),
       ],
     }
   }

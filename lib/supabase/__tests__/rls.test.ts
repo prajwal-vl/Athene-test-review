@@ -22,8 +22,8 @@ describe('supabase auth scaffold', () => {
     })
 
     expect(insertMock).toHaveBeenCalledTimes(1)
-    const payload = insertMock.mock.calls[0][0]
+    const payload = (insertMock.mock.calls as unknown as Array<[Record<string, unknown>]>)[0][0]
     expect(payload.query).not.toBe('show me sales pipeline')
-    expect(payload.query).toHaveLength(64)
+    expect((payload.query as string)).toHaveLength(64)
   })
 })

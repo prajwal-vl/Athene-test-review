@@ -11,7 +11,12 @@ import { sendEmail } from "@/lib/integrations/microsoft/outlook-fetcher";
 import type { EmailDraft } from "@/lib/integrations/microsoft/outlook-fetcher";
 import { createEvent } from "@/lib/integrations/microsoft/calendar-fetcher";
 import type { EventDraft } from "@/lib/integrations/microsoft/calendar-fetcher";
+import { sendEmail as gmailSendEmail } from "@/lib/integrations/google/gmail-fetcher";
+import { createCalendarEvent } from "@/lib/integrations/google/calendar-fetcher";
+import type { EventDraft as GoogleEventDraft } from "@/lib/integrations/google/calendar-fetcher";
 import { supabaseAdmin } from "@/lib/supabase/server";
+import { qstash } from "@/lib/qstash/client";
+import { getAppBaseUrl } from "@/lib/config/app-url";
 
 type PendingWriteAction = {
   tool: string;
@@ -19,7 +24,7 @@ type PendingWriteAction = {
   requested_at: string;
 };
 
-async function resolveMicrosoftConnectionId(clerkOrgId: string): Promise<string> {
+async function resolveOrgId(clerkOrgId: string): Promise<string> {
   const { data: orgRow, error: orgError } = await supabaseAdmin
     .from("organizations")
     .select("id")
@@ -33,10 +38,16 @@ async function resolveMicrosoftConnectionId(clerkOrgId: string): Promise<string>
     throw new Error("Organization not found for this Clerk org");
   }
 
+  return orgRow.id;
+}
+
+async function resolveMicrosoftConnectionId(clerkOrgId: string): Promise<string> {
+  const orgId = await resolveOrgId(clerkOrgId);
+
   const { data: connectionRow, error: connectionError } = await supabaseAdmin
     .from("nango_connections")
     .select("connection_id")
-    .eq("org_id", orgRow.id)
+    .eq("org_id", orgId)
     .eq("provider_config_key", "microsoft")
     .order("created_at", { ascending: false })
     .limit(1)
@@ -50,6 +61,33 @@ async function resolveMicrosoftConnectionId(clerkOrgId: string): Promise<string>
   }
 
   return connectionRow.connection_id;
+}
+
+async function resolveGoogleConnectionId(clerkOrgId: string, providerKey: 'gmail' | 'google-calendar' | 'google'): Promise<string> {
+  const orgId = await resolveOrgId(clerkOrgId);
+
+  // Try the specific key first, then fall back to 'google' (combined connection)
+  const keysToTry = providerKey === 'google' ? ['google'] : [providerKey, 'google'];
+
+  for (const key of keysToTry) {
+    const { data: connectionRow, error: connectionError } = await supabaseAdmin
+      .from("nango_connections")
+      .select("connection_id")
+      .eq("org_id", orgId)
+      .eq("provider_config_key", key)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (connectionError) {
+      throw new Error(`Failed to resolve Google connection: ${connectionError.message}`);
+    }
+    if (connectionRow?.connection_id) {
+      return connectionRow.connection_id;
+    }
+  }
+
+  throw new Error("No Google connection configured for this organization");
 }
 
 function toEmailDraft(payload: Record<string, unknown>): EmailDraft {
@@ -74,6 +112,65 @@ function toEmailDraft(payload: Record<string, unknown>): EmailDraft {
     ccRecipients: cc.map((address) => ({
       emailAddress: { address },
     })),
+  };
+}
+
+/**
+ * Converts the agent payload (same shape as the Microsoft email payload)
+ * into a base64url-encoded RFC 2822 message for the Gmail send API.
+ */
+function toGmailRaw(payload: Record<string, unknown>): string {
+  const to = Array.isArray(payload.to) ? payload.to.filter((v): v is string => typeof v === "string") : [];
+  const cc = Array.isArray(payload.cc) ? payload.cc.filter((v): v is string => typeof v === "string") : [];
+  const subject = typeof payload.subject === "string" ? payload.subject : "";
+  const body = typeof payload.body === "string" ? payload.body : "";
+
+  if (to.length === 0) {
+    throw new Error("Approved email draft is missing recipients");
+  }
+
+  const lines: string[] = [
+    `To: ${to.join(", ")}`,
+  ];
+  if (cc.length > 0) {
+    lines.push(`Cc: ${cc.join(", ")}`);
+  }
+  lines.push(`Subject: ${subject}`, "Content-Type: text/plain; charset=utf-8", "", body);
+
+  const message = lines.join("\r\n");
+  // Gmail requires base64url encoding (no padding)
+  return Buffer.from(message).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function toGoogleEventDraft(payload: Record<string, unknown>): GoogleEventDraft {
+  const summary = typeof payload.summary === "string" ? payload.summary : "";
+  const description = typeof payload.description === "string" ? payload.description : undefined;
+  const location = typeof payload.location === "string" ? payload.location : undefined;
+  const start = payload.start as { dateTime?: unknown; timeZone?: unknown } | undefined;
+  const end = payload.end as { dateTime?: unknown; timeZone?: unknown } | undefined;
+  const attendees = Array.isArray(payload.attendees)
+    ? payload.attendees.filter((a): a is { email?: unknown } => typeof a === "object" && a !== null)
+    : [];
+
+  if (!summary || !start?.dateTime || !end?.dateTime) {
+    throw new Error("Approved calendar draft is missing required event fields");
+  }
+
+  return {
+    summary,
+    description,
+    location,
+    start: {
+      dateTime: String(start.dateTime),
+      timeZone: start.timeZone ? String(start.timeZone) : "UTC",
+    },
+    end: {
+      dateTime: String(end.dateTime),
+      timeZone: end.timeZone ? String(end.timeZone) : "UTC",
+    },
+    attendees: attendees
+      .filter((a) => typeof a.email === "string" && (a.email as string).length > 0)
+      .map((a) => ({ email: String(a.email) })),
   };
 }
 
@@ -131,10 +228,10 @@ export async function actionExecutorNode(
 
   try {
     let result: unknown;
-    const connectionId = await resolveMicrosoftConnectionId(state.org_id);
 
     switch (action.tool) {
       case "email-send": {
+        const connectionId = await resolveMicrosoftConnectionId(state.org_id);
         result = await sendEmail(
           connectionId,
           state.org_id,
@@ -143,11 +240,43 @@ export async function actionExecutorNode(
         break;
       }
       case "calendar-create": {
+        const connectionId = await resolveMicrosoftConnectionId(state.org_id);
         result = await createEvent(
           connectionId,
           state.org_id,
           toEventDraft(action.payload)
         );
+        break;
+      }
+      case "gmail-send": {
+        const connectionId = await resolveGoogleConnectionId(state.org_id, "gmail");
+        result = await gmailSendEmail(
+          connectionId,
+          state.org_id,
+          toGmailRaw(action.payload)
+        );
+        break;
+      }
+      case "google-calendar-create": {
+        const connectionId = await resolveGoogleConnectionId(state.org_id, "google-calendar");
+        result = await createCalendarEvent(
+          connectionId,
+          state.org_id,
+          toGoogleEventDraft(action.payload)
+        );
+        break;
+      }
+      case "data-index": {
+        const { org_id, document_ids, doc_count } = action.payload as {
+          org_id: string;
+          document_ids: string[];
+          doc_count: number;
+        };
+        await qstash.publishJSON({
+          url: `${getAppBaseUrl()}/api/worker/index-delta`,
+          body: { org_id, document_ids },
+        });
+        result = { queued: doc_count };
         break;
       }
       default:

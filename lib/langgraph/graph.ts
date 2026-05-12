@@ -40,16 +40,10 @@ import { crossDeptRetrievalAgent } from "./nodes/cross-dept-retrieval";
 import { synthesisAgent }          from "./nodes/synthesis-agent";
 import { approvalNode }            from "./nodes/async-tool-node";
 import { actionExecutorNode }      from "./nodes/action-executor";
-
-// ── Stub factory ─────────────────────────────────────────────────────────────
-// Replace each stub as the real node lands in its own ticket.
-// The stub logs a warning so it is visible in staging logs immediately.
-function stubNode(label: string) {
-  return async (state: typeof AtheneState.State): Promise<Partial<typeof AtheneState.State>> => {
-    console.warn(`[graph] stub node reached: ${label}`, { org_id: state.org_id });
-    return { next: "FINISH" };
-  };
-}
+import { emailAgentNode }          from "../agents/email-agent";
+import { calendarAgent }           from "../agents/calendar-agent";
+import { reportAgent }             from "../agents/report-agent";
+import { dataIndexAgent }          from "../agents/data-index-agent";
 
 // ── Compiled graph singleton ────────────────────────────────────────────────
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -78,10 +72,10 @@ export async function getAgentGraph(): Promise<AtheneGraph> {
     workflow.addNode("supervisor",          supervisor);
     workflow.addNode("retrieval_agent",     retrievalAgent);
     workflow.addNode("cross_dept_agent",    crossDeptRetrievalAgent);
-    workflow.addNode("email_agent",         stubNode("email_agent"));
-    workflow.addNode("calendar_agent",      stubNode("calendar_agent"));
-    workflow.addNode("report_agent",        stubNode("report_agent"));
-    workflow.addNode("data_index_agent",    stubNode("data_index_agent"));
+    workflow.addNode("email_agent",         emailAgentNode);
+    workflow.addNode("calendar_agent",      calendarAgent);
+    workflow.addNode("report_agent",        reportAgent);
+    workflow.addNode("data_index_agent",    dataIndexAgent);
     // approval_node: graph is interrupted BEFORE this node executes (HITL gate)
     workflow.addNode("approval_node",       approvalNode);
     workflow.addNode("action_executor",     actionExecutorNode);

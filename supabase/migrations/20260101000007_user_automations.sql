@@ -6,13 +6,11 @@
 -- Automations — user-configured scheduled tasks
 -- ============================================================
 
-CREATE TYPE automation_status AS ENUM (
-  'active',
-  'paused',
-  'error'
-);
+DO $$ BEGIN
+  CREATE TYPE automation_status AS ENUM ('active', 'paused', 'error');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-CREATE TABLE automations (
+CREATE TABLE IF NOT EXISTS automations (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   org_id          uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
   user_id         uuid NOT NULL REFERENCES org_members(id) ON DELETE CASCADE,
@@ -36,7 +34,7 @@ CREATE TABLE automations (
 -- Briefings — generated morning briefing content
 -- ============================================================
 
-CREATE TABLE briefings (
+CREATE TABLE IF NOT EXISTS briefings (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   org_id          uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
   user_id         uuid NOT NULL REFERENCES org_members(id) ON DELETE CASCADE,
@@ -57,7 +55,7 @@ CREATE TABLE briefings (
 -- Insights — saved BI query cards
 -- ============================================================
 
-CREATE TABLE insights (
+CREATE TABLE IF NOT EXISTS insights (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   org_id          uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
   created_by      uuid NOT NULL REFERENCES org_members(id) ON DELETE CASCADE,

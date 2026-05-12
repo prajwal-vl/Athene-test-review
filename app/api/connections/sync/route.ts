@@ -15,10 +15,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { dispatchThrottled } from '@/lib/qstash/client'
 import { getAppBaseUrl } from '@/lib/config/app-url'
 import { PROVIDER_WORKER_KEYS } from '@/lib/integrations/providers'
+import { resolveOrgUuid } from '@/lib/auth/rbac'
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const { userId, orgId } = await auth()
   if (!userId || !orgId) return new NextResponse('Unauthorized', { status: 401 })
+
+  const orgUuid = await resolveOrgUuid(orgId)
+  if (!orgUuid) return new NextResponse('Organization not found', { status: 403 })
 
   let body: { connectionId?: string; provider?: string }
   try {
@@ -46,10 +50,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const results = await Promise.all(
     workerKeys.map((workerKey) =>
       dispatchThrottled({
-        orgId,
+        orgId: orgUuid,
         sourceType: workerKey,
         url,
-        body: { orgId, connectionId, provider: workerKey },
+        body: { orgId: orgUuid, connectionId, provider: workerKey },
       }),
     ),
   )

@@ -17,6 +17,7 @@ import { z } from "zod";
 import { getModel } from "../langgraph/llm-factory";
 import type { AtheneStateType, AtheneStateUpdate } from "../langgraph/state";
 import { AIMessage } from "@langchain/core/messages";
+import { supabaseAdmin } from "@/lib/supabase/server";
 
 // ---- Structured output schema --------------------------------
 
@@ -110,6 +111,40 @@ You are a Strategic Calendar Assistant. Your mission is to translate complex, hu
 - If you are missing critical information (like the date), ask the user for it politely.
 - Never claim to have "created" the event; always say you have "prepared the draft" for their approval.`;
 
+// ---- Provider detection ----------------------------------------
+
+async function resolveCalendarTool(clerkOrgId: string): Promise<"calendar-create" | "google-calendar-create"> {
+  const { data: orgRow } = await supabaseAdmin
+    .from("organizations")
+    .select("id")
+    .eq("clerk_org_id", clerkOrgId)
+    .maybeSingle();
+
+  if (!orgRow) return "calendar-create";
+
+  const { data: msConn } = await supabaseAdmin
+    .from("nango_connections")
+    .select("id")
+    .eq("org_id", orgRow.id)
+    .eq("provider_config_key", "microsoft")
+    .limit(1)
+    .maybeSingle();
+
+  if (msConn) return "calendar-create";
+
+  const { data: gcalConn } = await supabaseAdmin
+    .from("nango_connections")
+    .select("id")
+    .eq("org_id", orgRow.id)
+    .in("provider_config_key", ["google-calendar", "google"])
+    .limit(1)
+    .maybeSingle();
+
+  if (gcalConn) return "google-calendar-create";
+
+  return "calendar-create";
+}
+
 // ---- Agent node ---------------------------------------------
 
 /**
@@ -146,10 +181,12 @@ User Timezone: ${timezone}`;
       ...state.messages,
     ]);
 
+    const calendarTool = await resolveCalendarTool(state.org_id);
+
     return {
       awaiting_approval: true,
       pending_write_action: {
-        tool: "calendar-create",
+        tool: calendarTool,
         payload: draft as Record<string, unknown>,
         requested_at: now.toISOString(),
       },

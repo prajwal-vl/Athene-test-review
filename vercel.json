@@ -1,0 +1,10 @@
+{
+  "framework": "nextjs",
+  "functions": {
+    "app/api/agent/route.ts": { "maxDuration": 300 },
+    "app/api/worker/nango-fetch/route.ts": { "maxDuration": 300 },
+    "app/api/worker/graph-build/route.ts": { "maxDuration": 300 },
+    "app/api/worker/index-delta/route.ts": { "maxDuration": 300 },
+    "app/api/worker/morning-briefing/route.ts": { "maxDuration": 300 }
+  }
+}

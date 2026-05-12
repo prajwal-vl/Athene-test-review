@@ -45,7 +45,7 @@ import { maxTier, TIER_RANK } from "./tier-utils";
 export type ModelTier = "simple" | "medium" | "complex";
 
 /** LLM provider identifier stored in `llm_keys.provider` */
-export type LLMProvider = "anthropic" | "openai" | "google";
+export type LLMProvider = "anthropic" | "openai" | "google" | "deepseek";
 
 /** Returned by resolveModelClient */
 export interface ResolvedModel {
@@ -73,6 +73,11 @@ const MODEL_MATRIX: Readonly<Record<LLMProvider, Readonly<Record<ModelTier, stri
     simple:  "gemini-2.0-flash",
     medium:  "gemini-2.5-pro",
     complex: "gemini-2.5-pro",
+  },
+  deepseek: {
+    simple:  "deepseek-v4-flash",
+    medium:  "deepseek-v4-pro",
+    complex: "deepseek-v4-pro",
   },
 } as const;
 
@@ -150,6 +155,15 @@ function buildOpenAIClient(apiKey: string, model: string): BaseChatModel {
   return new ChatOpenAI({ apiKey, modelName: model, temperature: 0 }) as unknown as BaseChatModel;
 }
 
+function buildDeepSeekClient(apiKey: string, model: string): BaseChatModel {
+  return new ChatOpenAI({
+    apiKey,
+    modelName: model,
+    temperature: 0,
+    configuration: { baseURL: "https://api.deepseek.com/v1" },
+  }) as unknown as BaseChatModel;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function buildGoogleClient(apiKey: string, model: string): BaseChatModel {
   return new ChatGoogleGenerativeAI({ apiKey, model, temperature: 0 }) as unknown as BaseChatModel;
@@ -172,6 +186,11 @@ function buildPlatformClient(provider: LLMProvider, model: string): BaseChatMode
       if (!key) throw new Error("[llm-factory] GOOGLE_API_KEY is not set");
       return buildGoogleClient(key, model);
     }
+    case "deepseek": {
+      const key = process.env.DEEPSEEK_API_KEY;
+      if (!key) throw new Error("[llm-factory] DEEPSEEK_API_KEY is not set");
+      return buildDeepSeekClient(key, model);
+    }
   }
 }
 
@@ -180,10 +199,11 @@ function buildPlatformClient(provider: LLMProvider, model: string): BaseChatMode
 function defaultProvider(): LLMProvider {
   if (process.env.ANTHROPIC_API_KEY) return "anthropic";
   if (process.env.OPENAI_API_KEY)    return "openai";
+  if (process.env.DEEPSEEK_API_KEY)  return "deepseek";
   if (process.env.GOOGLE_API_KEY)    return "google";
   throw new Error(
     "[llm-factory] No platform LLM API key found. " +
-    "Set ANTHROPIC_API_KEY, OPENAI_API_KEY, or GOOGLE_API_KEY."
+    "Set ANTHROPIC_API_KEY, OPENAI_API_KEY, DEEPSEEK_API_KEY, or GOOGLE_API_KEY."
   );
 }
 
@@ -217,6 +237,7 @@ export async function resolveModelClient(
       case "anthropic": client = buildAnthropicClient(byok.plaintext, modelName); break;
       case "openai":    client = buildOpenAIClient(byok.plaintext, modelName);    break;
       case "google":    client = buildGoogleClient(byok.plaintext, modelName);    break;
+      case "deepseek":  client = buildDeepSeekClient(byok.plaintext, modelName);  break;
     }
     return { client, provider: byok.provider, model: modelName, tier, byok: true };
   }

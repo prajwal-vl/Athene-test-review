@@ -1,0 +1,303 @@
+integrations:
+  # ── Google ────────────────────────────────────────────────────────────────
+
+  google-drive:
+    provider: google-drive
+    syncs:
+      drive-files:
+        description: Sync files and folders from Google Drive
+        runs: every 1h
+        output: DriveFile
+        endpoint: GET /drive/files
+        auto_start: false
+
+  gmail:
+    provider: gmail
+    syncs:
+      emails:
+        description: Sync recent emails (metadata only — bodies never stored)
+        runs: every 30m
+        output: EmailMetadata
+        endpoint: GET /emails
+        auto_start: false
+    actions:
+      send-email:
+        description: Send an email via the authenticated Gmail account
+        output: SendEmailResult
+        endpoint: POST /emails/send
+
+  google-calendar:
+    provider: google-calendar
+    syncs:
+      events:
+        description: Sync calendar events for the next 90 days
+        runs: every 30m
+        output: CalendarEvent
+        endpoint: GET /calendar/events
+        auto_start: false
+    actions:
+      create-event:
+        description: Create a new event on the primary Google Calendar
+        output: CalendarEvent
+        endpoint: POST /calendar/events
+
+  # Alias used when a single Google OAuth token covers Drive + Gmail + Calendar
+  google:
+    provider: google
+    syncs:
+      drive-files:
+        description: Sync files from Google Drive
+        runs: every 1h
+        output: DriveFile
+        endpoint: GET /drive/files
+        auto_start: false
+      emails:
+        description: Sync recent Gmail messages (metadata only)
+        runs: every 30m
+        output: EmailMetadata
+        endpoint: GET /gmail/emails
+        auto_start: false
+      calendar-events:
+        description: Sync Google Calendar events
+        runs: every 30m
+        output: CalendarEvent
+        endpoint: GET /calendar/events
+        auto_start: false
+    actions:
+      send-email:
+        description: Send an email via Gmail
+        output: SendEmailResult
+        endpoint: POST /gmail/emails/send
+      create-calendar-event:
+        description: Create a new Google Calendar event
+        output: CalendarEvent
+        endpoint: POST /calendar/events
+
+  # ── Microsoft ─────────────────────────────────────────────────────────────
+
+  microsoft-graph:
+    provider: microsoft
+    syncs:
+      graph-data:
+        description: Sync emails, calendar events and SharePoint files via Microsoft Graph
+        runs: every 1h
+        output: GraphItem
+        endpoint: GET /graph/items
+        auto_start: false
+
+  microsoft:
+    provider: microsoft
+    syncs:
+      emails:
+        description: Sync Outlook emails (metadata + preview only)
+        runs: every 30m
+        output: OutlookEmail
+        endpoint: GET /outlook/emails
+        auto_start: false
+      calendar-events:
+        description: Sync Outlook calendar events
+        runs: every 30m
+        output: OutlookCalendarEvent
+        endpoint: GET /outlook/calendar/events
+        auto_start: false
+      sharepoint-files:
+        description: Sync SharePoint document library files
+        runs: every 1h
+        output: SharePointFile
+        endpoint: GET /sharepoint/files
+        auto_start: false
+    actions:
+      send-email:
+        description: Send an email via Outlook / Microsoft Graph
+        output: SendEmailResult
+        endpoint: POST /outlook/emails/send
+      create-calendar-event:
+        description: Create a new Outlook calendar event
+        output: OutlookCalendarEvent
+        endpoint: POST /outlook/calendar/events
+
+  # ── Slack ─────────────────────────────────────────────────────────────────
+
+  slack:
+    provider: slack
+    syncs:
+      messages:
+        description: Sync recent messages from accessible Slack channels
+        runs: every 30m
+        output: SlackMessage
+        endpoint: GET /slack/messages
+        auto_start: false
+
+  # ── Notion ────────────────────────────────────────────────────────────────
+
+  notion:
+    provider: notion
+    syncs:
+      pages:
+        description: Sync Notion pages
+        runs: every 1h
+        output: NotionPage
+        endpoint: GET /notion/pages
+        auto_start: false
+      databases:
+        description: Sync Notion database entries
+        runs: every 1h
+        output: NotionDatabase
+        endpoint: GET /notion/databases
+        auto_start: false
+
+  # ── HubSpot ───────────────────────────────────────────────────────────────
+
+  hubspot:
+    provider: hubspot
+    syncs:
+      companies:
+        description: Sync HubSpot companies
+        runs: every 2h
+        output: HubSpotCompany
+        endpoint: GET /hubspot/companies
+        auto_start: false
+      contacts:
+        description: Sync HubSpot contacts
+        runs: every 2h
+        output: HubSpotContact
+        endpoint: GET /hubspot/contacts
+        auto_start: false
+      deals:
+        description: Sync HubSpot deals
+        runs: every 2h
+        output: HubSpotDeal
+        endpoint: GET /hubspot/deals
+        auto_start: false
+      notes:
+        description: Sync HubSpot notes
+        runs: every 2h
+        output: HubSpotNote
+        endpoint: GET /hubspot/notes
+        auto_start: false
+
+  # ── Salesforce ────────────────────────────────────────────────────────────
+
+  salesforce:
+    provider: salesforce
+    syncs:
+      accounts:
+        description: Sync Salesforce accounts
+        runs: every 2h
+        output: SalesforceAccount
+        endpoint: GET /salesforce/accounts
+        auto_start: false
+      cases:
+        description: Sync Salesforce support cases
+        runs: every 2h
+        output: SalesforceCase
+        endpoint: GET /salesforce/cases
+        auto_start: false
+      opportunities:
+        description: Sync Salesforce opportunities
+        runs: every 2h
+        output: SalesforceOpportunity
+        endpoint: GET /salesforce/opportunities
+        auto_start: false
+
+  # ── GitHub ────────────────────────────────────────────────────────────────
+
+  github:
+    provider: github
+    syncs:
+      issues:
+        description: Sync GitHub issues
+        runs: every 1h
+        output: GitHubIssue
+        endpoint: GET /github/issues
+        auto_start: false
+      pull-requests:
+        description: Sync GitHub pull requests
+        runs: every 1h
+        output: GitHubPR
+        endpoint: GET /github/pull-requests
+        auto_start: false
+      wiki:
+        description: Sync GitHub wiki pages
+        runs: every 6h
+        output: GitHubWikiPage
+        endpoint: GET /github/wiki
+        auto_start: false
+
+  # ── Linear ────────────────────────────────────────────────────────────────
+
+  linear:
+    provider: linear
+    syncs:
+      issues:
+        description: Sync Linear issues
+        runs: every 1h
+        output: LinearIssue
+        endpoint: GET /linear/issues
+        auto_start: false
+      cycles:
+        description: Sync Linear cycles
+        runs: every 2h
+        output: LinearCycle
+        endpoint: GET /linear/cycles
+        auto_start: false
+      projects:
+        description: Sync Linear projects
+        runs: every 2h
+        output: LinearProject
+        endpoint: GET /linear/projects
+        auto_start: false
+
+  # ── Zendesk ───────────────────────────────────────────────────────────────
+
+  zendesk:
+    provider: zendesk
+    syncs:
+      tickets:
+        description: Sync Zendesk support tickets
+        runs: every 1h
+        output: ZendeskTicket
+        endpoint: GET /zendesk/tickets
+        auto_start: false
+      articles:
+        description: Sync Zendesk Help Center articles
+        runs: every 6h
+        output: ZendeskArticle
+        endpoint: GET /zendesk/articles
+        auto_start: false
+
+  # ── Jira ──────────────────────────────────────────────────────────────────
+
+  jira:
+    provider: atlassian
+    syncs:
+      issues:
+        description: Sync Jira issues
+        runs: every 1h
+        output: JiraIssue
+        endpoint: GET /jira/issues
+        auto_start: false
+
+  # ── Confluence ────────────────────────────────────────────────────────────
+
+  confluence:
+    provider: atlassian
+    syncs:
+      pages:
+        description: Sync Confluence pages
+        runs: every 2h
+        output: ConfluencePage
+        endpoint: GET /confluence/pages
+        auto_start: false
+
+  # ── Snowflake ─────────────────────────────────────────────────────────────
+
+  snowflake:
+    provider: snowflake
+    syncs:
+      samples:
+        description: Sync Snowflake table samples for schema discovery
+        runs: every 6h
+        output: SnowflakeSample
+        endpoint: GET /snowflake/samples
+        auto_start: false

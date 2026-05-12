@@ -49,6 +49,10 @@ import { microsoftFetcher } from '@/lib/integrations/microsoft/index'
 import { fetchJiraIssues } from '@/lib/integrations/atlassian/jira-fetcher'
 import { fetchConfluencePages } from '@/lib/integrations/atlassian/confluence-fetcher'
 import { getAppBaseUrl } from '@/lib/config/app-url'
+import { retryWithBackoff } from '@/lib/integrations/retry'
+import { supabaseAdmin } from '@/lib/supabase/server'
+
+export const maxDuration = 300; // Vercel max for Pro plan
 
 // ---- Provider Fetcher Map ---------------------------------------
 
@@ -174,6 +178,18 @@ const providerFetcherMap: Record<string, FetcherFn[]> = {
 
   'microsoft-graph': [microsoftFetcher],
 
+  // Aliases for UI nangoKey values that fan out to per-service fetchers
+  google: [
+    async (connectionId, orgId) => fetchDriveChunks(connectionId, orgId),
+    async (connectionId, orgId) => searchEmailChunks(connectionId, orgId, 'newer_than:90d', 50),
+    async (connectionId, orgId) => {
+      const timeMin = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+      const timeMax = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000)
+      return fetchCalendarChunks(connectionId, orgId, timeMin, timeMax)
+    },
+  ],
+  microsoft: [microsoftFetcher],
+
   jira: [fetchJiraIssues],
 
   confluence: [fetchConfluencePages],
@@ -217,6 +233,19 @@ export async function POST(request: Request): Promise<Response> {
     )
   }
 
+  // 2a. Verify connection belongs to this org (defense-in-depth)
+  const { data: conn } = await supabaseAdmin
+    .from('nango_connections')
+    .select('id, org_id')
+    .eq('connection_id', connectionId)
+    .eq('org_id', orgId)
+    .maybeSingle()
+
+  if (!conn) {
+    logger.warn({ connectionId, orgId }, '[nango-fetch] Connection not found for org, skipping')
+    return NextResponse.json({ error: 'Connection not found' }, { status: 404 })
+  }
+
   // 3. Look up the fetcher
   const fetchers = providerFetcherMap[provider]
   if (!fetchers) {
@@ -227,11 +256,32 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   try {
-    // 4. Run all fetchers for this provider
+    // 4. Run all fetchers for this provider, each wrapped with retry+backoff.
+    // If a fetcher still fails after retries, log and continue — partial sync
+    // is better than no sync.
     const allChunks: FetchedChunk[] = []
     for (const fetcher of fetchers) {
-      const chunks = await fetcher(connectionId, orgId, { since })
-      allChunks.push(...chunks)
+      try {
+        const chunks = await retryWithBackoff(
+          () => fetcher(connectionId, orgId, { since }),
+          {
+            retries: 3,
+            baseDelayMs: 1000,
+            onRetry: (err, attempt) => {
+              logger.warn(
+                { provider, orgId, attempt, err: err instanceof Error ? err.message : String(err) },
+                '[nango-fetch] Fetcher failed, retrying'
+              )
+            },
+          }
+        )
+        allChunks.push(...chunks)
+      } catch (fetcherErr) {
+        logger.error(
+          { provider, orgId, err: fetcherErr instanceof Error ? fetcherErr.message : String(fetcherErr) },
+          '[nango-fetch] Fetcher failed after all retries, continuing with partial results'
+        )
+      }
     }
 
     // 5. Index all fetched chunks (connectionId resolves/creates the documents row)
@@ -245,7 +295,7 @@ export async function POST(request: Request): Promise<Response> {
     // 6. Enqueue graph-build job if any chunks were indexed (ATH-44)
     //    Fire-and-forget: graph build runs asynchronously after embedding.
     if (result.indexed > 0) {
-      const docIds = [...new Set(allChunks.map((c) => c.chunk_id))]
+      const docIds = result.documentIds
       const graphBuildUrl = `${getAppBaseUrl()}/api/worker/graph-build`
       try {
         await qstash.publishJSON({
