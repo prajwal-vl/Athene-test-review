@@ -12,11 +12,11 @@
  *
  * Model selection matrix:
  *
- *  Complexity │ Anthropic           │ OpenAI        │ Google
- *  ───────────┼─────────────────────┼───────────────┼─────────────────
- *  simple     │ claude-haiku-4-5    │ gpt-4o-mini   │ gemini-2.0-flash
- *  medium     │ claude-sonnet-4-5   │ gpt-4o        │ gemini-2.5-pro
- *  complex    │ claude-opus-4-5     │ gpt-4o        │ gemini-2.5-pro
+ *  Complexity │ Anthropic           │ OpenAI        │ Google            │ DeepSeek
+ *  ───────────┼─────────────────────┼───────────────┼───────────────────┼──────────────────
+ *  simple     │ claude-haiku-4-5    │ gpt-4o-mini   │ gemini-2.0-flash  │ deepseek-chat
+ *  medium     │ claude-sonnet-4-5   │ gpt-4o        │ gemini-2.5-pro    │ deepseek-chat
+ *  complex    │ claude-opus-4-5     │ gpt-4o        │ gemini-2.5-pro    │ deepseek-reasoner
  *
  * Security:
  *  - Decrypted key strings are scoped to the function call; they are never
@@ -75,9 +75,9 @@ const MODEL_MATRIX: Readonly<Record<LLMProvider, Readonly<Record<ModelTier, stri
     complex: "gemini-2.5-pro",
   },
   deepseek: {
-    simple:  "deepseek-v4-flash",
-    medium:  "deepseek-v4-pro",
-    complex: "deepseek-v4-pro",
+    simple:  "deepseek-chat",
+    medium:  "deepseek-chat",
+    complex: "deepseek-reasoner",
   },
 } as const;
 

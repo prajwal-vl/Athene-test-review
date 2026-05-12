@@ -20,7 +20,7 @@ interface LlmKey {
   updated_at: string;
 }
 
-const PROVIDERS = ["openai", "anthropic", "google"];
+const PROVIDERS = ["anthropic", "openai", "google", "deepseek"];
 
 export default function KeysPage() {
   const [keys, setKeys] = useState<LlmKey[]>([]);
