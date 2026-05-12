@@ -24,6 +24,7 @@ CREATE POLICY audit_logs_admin_read ON audit_logs
   );
 
 -- bi_access_audit — written by cross-dept-agent after every cross-department query
+DROP VIEW IF EXISTS bi_access_audit;
 CREATE TABLE IF NOT EXISTS bi_access_audit (
   id          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
   org_id      uuid        NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,

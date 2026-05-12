@@ -5,6 +5,45 @@
 -- Enable pgvector if not already enabled (idempotent)
 CREATE EXTENSION IF NOT EXISTS vector;
 
+-- Drop old versions if they exist to match new schema
+DROP TABLE IF EXISTS kg_edges CASCADE;
+DROP TABLE IF EXISTS kg_nodes CASCADE;
+DROP TABLE IF EXISTS insights CASCADE;
+
+-- Also reset document_embeddings if it's missing the content_preview column
+DO $$ 
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='document_embeddings' AND column_name='content_preview') THEN
+        DROP TABLE IF EXISTS document_embeddings CASCADE;
+    END IF;
+END $$;
+
+-- Recreate document_embeddings with the correct schema if it was dropped
+CREATE TABLE IF NOT EXISTS document_embeddings (
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id          uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  document_id     uuid NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+  chunk_index     int NOT NULL,
+  content_preview text,
+  embedding       vector(1536) NOT NULL,
+  department_id   uuid,
+  owner_user_id   uuid,
+  visibility      text NOT NULL DEFAULT 'department',
+  source_type     text NOT NULL,
+  token_count     int,
+  metadata        jsonb DEFAULT '{}',
+  created_at      timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (document_id, chunk_index)
+);
+
+-- Ensure org_members has department_id column
+DO $$ 
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='org_members' AND column_name='department_id') THEN
+        ALTER TABLE org_members ADD COLUMN department_id uuid REFERENCES departments(id) ON DELETE SET NULL;
+    END IF;
+END $$;
+
 -- ─── kg_nodes ────────────────────────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS kg_nodes (
@@ -166,12 +205,12 @@ STABLE
 AS $$
   SELECT
     id::text                              AS chunk_id,
-    document_id,
-    LEFT(content, 500)                    AS content_preview,
+    document_id::text                     AS document_id,
+    content_preview,
     chunk_index,
     source_type,
-    source_url                            AS external_url,
-    dept_id                               AS department_id,
+    metadata->>'source_url'               AS external_url,
+    department_id,
     NULL::text                            AS community_id,
     1 - (embedding <=> query_embedding)   AS similarity
   FROM document_embeddings

@@ -11,13 +11,53 @@ export type UserAccess = {
   biGrantId: string | null;
 };
 
-export async function resolveUserAccess(userId: string, orgId: string, fallbackRole?: UserRole): Promise<UserAccess> {
+export async function resolveUserAccess(userId: string, clerkOrgId: string, fallbackRole?: UserRole): Promise<UserAccess> {
+  if (!clerkOrgId || clerkOrgId === "no-org") {
+    return {
+      userId,
+      orgId: "no-org",
+      role: (fallbackRole || "member") as UserRole,
+      deptId: "",
+      accessibleDeptIds: [],
+      biGrantId: null,
+    };
+  }
+
+  // Resolve Supabase UUID from Clerk Org ID
+  const supabase = createSupabaseServiceClient();
+  let { data: org } = await supabase
+    .from("organizations")
+    .select("id")
+    .eq("clerk_org_id", clerkOrgId)
+    .maybeSingle();
+
+  // Auto-provision organization if missing (Fallback until Webhook is set up)
+  if (!org) {
+    console.log(`[rbac] Auto-provisioning organization: ${clerkOrgId}`);
+    const { data: newOrg, error: orgError } = await supabase
+      .from("organizations")
+      .insert({
+        clerk_org_id: clerkOrgId,
+        name: "My Organization",
+        slug: `org-${clerkOrgId.slice(-6).toLowerCase()}`
+      })
+      .select("id")
+      .single();
+    
+    if (orgError) {
+        console.error(`[rbac] Org auto-provision failed: ${orgError.message}`);
+    } else {
+        org = newOrg;
+    }
+  }
+
+  const orgId = org?.id || clerkOrgId;
+
   const cacheKey = `user_access:${userId}:${orgId}`;
   const redis = getRedis();
   const cached = await redis.get<UserAccess>(cacheKey);
   if (cached) return cached;
 
-  const supabase = createSupabaseServiceClient();
   const { data: member, error: memberError } = await supabase
     .from("org_members")
     .select("id, role, department_id")
