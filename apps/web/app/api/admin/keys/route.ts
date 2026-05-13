@@ -6,11 +6,11 @@ export const runtime = "nodejs";
 
 export async function GET(req: Request) {
   try {
-    const { identity } = await requireAdmin(req);
+    const { access } = await requireAdmin(req);
     const { data, error } = await createSupabaseServiceClient()
       .from("llm_keys")
       .select("id, provider, label, key_hint, is_active, created_at")
-      .eq("org_id", identity.orgId)
+      .eq("org_id", access.orgId)
       .eq("is_active", true);
     if (error) throw error;
     return Response.json(data);
@@ -21,7 +21,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const { identity } = await requireAdmin(req);
+    const { access } = await requireAdmin(req);
     const body = await req.json();
     const provider = String(body.provider || "");
     const rawKey = String(body.key || "");
@@ -36,7 +36,7 @@ export async function POST(req: Request) {
 
     // Use store_llm_key RPC — defined in migration 008_rls_helpers.sql
     const { error: storeError } = await supabase.rpc("store_llm_key", { 
-        p_org_id: identity.orgId,
+        p_org_id: access.orgId,
         p_provider: provider,
         p_plaintext: rawKey,
         p_kms_key: secret
