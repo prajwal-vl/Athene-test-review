@@ -1,4 +1,4 @@
-﻿export type ProviderKey =
+export type ProviderKey =
   | 'google'
   | 'microsoft'
   | 'slack'
@@ -11,6 +11,34 @@
   | 'github'
   | 'linear'
   | 'zendesk';
+
+/**
+ * Maps each canonical ProviderKey to the list of worker-level provider keys
+ * that the nango-fetch worker's providerFetcherMap understands.
+ *
+ * For multi-resource providers (Google, Microsoft) a single Nango OAuth
+ * connection fans out into N separate QStash jobs so each resource can
+ * be indexed, retried, and throttled independently.
+ *
+ * For single-resource providers the list contains exactly the same key
+ * as the Nango integration ID.
+ */
+export const PROVIDER_WORKER_KEYS: Record<ProviderKey, string[]> = {
+  // Google: one connection → three independent indexing jobs
+  google: ['google-drive', 'gmail', 'google-calendar'],
+  // Microsoft: one connection → one combined indexing job
+  microsoft: ['microsoft-graph'],
+  slack: ['slack'],
+  hubspot: ['hubspot'],
+  notion: ['notion'],
+  jira: ['jira'],
+  confluence: ['confluence'],
+  salesforce: ['salesforce'],
+  snowflake: ['snowflake'],
+  github: ['github'],
+  linear: ['linear'],
+  zendesk: ['zendesk'],
+};
 
 export interface ProviderCapabilities {
   canFetch: boolean;
@@ -36,6 +64,9 @@ export const PROVIDER_REGISTRY: Record<ProviderKey, ProviderConfig> = {
     description: 'Gmail, Drive, Calendar',
     icon: '/integrations/gdrive.svg',
     category: 'productivity',
+    // The single Nango integration that covers all Google scopes.
+    // Worker jobs fan out to 'google-drive' | 'gmail' | 'google-calendar'
+    // via PROVIDER_WORKER_KEYS above.
     nangoIntegrationId: 'google',
     resources: ['gmail', 'drive', 'calendar'],
     capabilities: {
@@ -50,6 +81,8 @@ export const PROVIDER_REGISTRY: Record<ProviderKey, ProviderConfig> = {
     description: 'Outlook, OneDrive, SharePoint, Calendar',
     icon: '/integrations/outlook.svg',
     category: 'productivity',
+    // The single Nango integration that covers all Microsoft Graph scopes.
+    // Worker job uses the 'microsoft-graph' key via PROVIDER_WORKER_KEYS above.
     nangoIntegrationId: 'microsoft',
     resources: ['emails', 'files', 'documents', 'events'],
     capabilities: {
@@ -210,4 +243,12 @@ export function getProvidersByCategory(category: string): ProviderConfig[] {
 
 export function getAllProviders(): ProviderConfig[] {
   return Object.values(PROVIDER_REGISTRY);
+}
+
+/**
+ * Returns the list of worker-level provider keys to dispatch for a given
+ * canonical ProviderKey. Use this in the sync route to fan out jobs.
+ */
+export function getWorkerKeys(key: ProviderKey): string[] {
+  return PROVIDER_WORKER_KEYS[key] ?? [key];
 }
